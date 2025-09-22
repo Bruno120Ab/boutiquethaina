@@ -13,6 +13,7 @@ import {
   LogOut,
   RotateCcw
 } from 'lucide-react';
+import logo from "../../public/logo.png"
 
 interface LayoutProps {
   children: ReactNode;
@@ -44,7 +45,7 @@ const Layout = ({ children, onLogout }: LayoutProps) => {
           <div className="flex items-center space-x-4">
      <div className="flex items-center space-x-4">
   <img
-    src="src/assets/logo.png"
+    src={logo}
     alt="Boutique da Thaina"
     className="h-16 w-16 rounded-full object-cover"
   />
