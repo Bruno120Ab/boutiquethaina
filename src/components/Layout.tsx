@@ -50,7 +50,7 @@ const Layout = ({ children, onLogout }: LayoutProps) => {
     className="h-16 w-16 rounded-full object-cover"
   />
   <h1 className="text-3xl font-bold text-foreground">
-    Boutique da Thaina
+    Boutique Thaina
   </h1>
 </div>
 

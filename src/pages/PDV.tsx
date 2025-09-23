@@ -468,7 +468,7 @@ const PDV = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 10, 12].map((num) => (
+                        {[1, 2, 3, 4, 5, 6].map((num) => (
                           <SelectItem key={num} value={num.toString()}>
                             {num}x de {formatCurrency(getCartTotal() / num)}
                           </SelectItem>

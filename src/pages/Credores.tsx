@@ -247,16 +247,19 @@ const Credores = () => {
       const carneCount = carneInstallments.filter(c => c.creditorId === creditor.id).length;
 
       const saleData = {
-        saleId: sale.id!,
-        customerName: customer.name,
-        items: sale.items,
-        total: sale.total,
-        paymentMethod: sale.paymentMethod,
-        installments: sale.installments,
-        discount: sale.discount,
-        createdAt: sale.createdAt,
-        seller: user?.username || 'Desconhecido'
-      };
+      saleId: sale.id!,
+      customerName: customer.name,
+      customerCPF: customer.cpf,           // CPF do cliente
+      customerAddress: customer.address,   // Endereço do cliente
+      customerPhone: customer.phone,       // Telefone do cliente
+      items: sale.items,
+      total: sale.total,
+      discount: sale.discount,
+      paymentMethod: sale.paymentMethod,
+      installments: sale.installments,
+      createdAt: sale.createdAt,
+      seller: user?.username || 'Desconhecido'
+};
 
       // Gerar PDF do relatório de venda
       const pdfDataUri = PDFGenerator.generateSaleReport(saleData);
