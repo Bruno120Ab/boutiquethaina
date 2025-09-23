@@ -131,17 +131,17 @@ const Estoque = () => {
   const resetNewProduct = () => {
     setNewProduct({
       name: '',
-      price: 0,
-      stock: 0,
+      price: undefined,
+      stock: undefined,
       category: '',
       barcode: '',
       description: '',
       supplier: '',
-      minStock: 5
+      minStock: undefined
     });
-    setCost(0);
-    setMargin(0);
-    setTax(0);
+    setCost(undefined);
+    setMargin(undefined);
+    setTax(undefined);
     setIsManualPrice(false);
   };
 
@@ -201,12 +201,12 @@ const Estoque = () => {
               <DialogTitle>{editingProduct ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <InputField label="Nome *" value={newProduct.name} onChange={(v) => setNewProduct({ ...newProduct, name: v })} />
+              <InputField label="Nome *"  placeholder={'Nome do produto'}value={newProduct.name} onChange={(v) => setNewProduct({ ...newProduct, name: v })} />
               
               <div className="grid grid-cols-2 gap-2">
-                <InputField label="Custo do Produto" type="number" value={cost} onChange={(v) => { setCost(Number(v)); setIsManualPrice(false); }} />
-                <InputField label="Margem (%)" type="number" value={margin} onChange={(v) => { setMargin(Number(v)); setIsManualPrice(false); }} />
-                <InputField label="Impostos (%)" type="number" value={tax} onChange={(v) => { setTax(Number(v)); setIsManualPrice(false); }} />
+                <InputField label="Custo do Produto" type="number" placeholder={'R$0,00'} value={cost} onChange={(v) => { setCost(Number(v)); setIsManualPrice(false); }} />
+                <InputField label="Margem (%)" type="number" placeholder={'R$0,00'}  value={margin} onChange={(v) => { setMargin(Number(v)); setIsManualPrice(false); }} />
+                <InputField label="Impostos (%)" type="number" placeholder={'R$0,00'}  value={tax} onChange={(v) => { setTax(Number(v)); setIsManualPrice(false); }} />
                 <InputField
                   label="Preço Final *"
                   type="text" // usamos "text" para permitir a formatação com R$
@@ -219,13 +219,13 @@ const Estoque = () => {
                   }}
                   placeholder={`R$ ${ formatCurrency(calculatePrice())}`}
                 />
-                <InputField label="Estoque" type="number" value={newProduct.stock} onChange={(v) => setNewProduct({ ...newProduct, stock: Number(v) })} />
+                <InputField label="Estoque"  placeholder={'Quantidade de itens'} type="number" value={newProduct.stock} onChange={(v) => setNewProduct({ ...newProduct, stock: Number(v) })} />
               </div>
 
-              <InputField label="Categoria *" value={newProduct.category} onChange={(v) => setNewProduct({ ...newProduct, category: v })} />
+              <InputField label="Categoria *" placeholder={'Exemplo: Camisas, Calças e etc'} value={newProduct.category} onChange={(v) => setNewProduct({ ...newProduct, category: v })} />
               <InputField label="Código de Barras" value={newProduct.barcode} onChange={(v) => setNewProduct({ ...newProduct, barcode: v })} />
               <InputField label="Fornecedor" value={newProduct.supplier} onChange={(v) => setNewProduct({ ...newProduct, supplier: v })} />
-              <InputField label="Estoque Mínimo" type="number" value={newProduct.minStock} onChange={(v) => setNewProduct({ ...newProduct, minStock: Number(v) })} />
+              <InputField label="Estoque Mínimo"  placeholder={'Para controle de estoque baixo'} type="number" value={newProduct.minStock} onChange={(v) => setNewProduct({ ...newProduct, minStock: Number(v) })} />
 
               <Button onClick={saveProduct} className="w-full">{editingProduct ? 'Atualizar' : 'Adicionar'} Produto</Button>
             </div>
