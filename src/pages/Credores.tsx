@@ -53,7 +53,8 @@ const Credores = () => {
   const [selectedCreditor, setSelectedCreditor] = useState<Creditor | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [customMessage, setCustomMessage] = useState('');
-  
+  const [selectedVia, setSelectedVia] = useState<"cliente" | "credor" | "ambos" | "">("");
+
   // Form fields
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [totalDebt, setTotalDebt] = useState('');
@@ -134,75 +135,149 @@ const Credores = () => {
     }
   };
 
-  const generateCarne = async (creditor: Creditor, installments: number) => {
-    try {
-      const customer = customers.find(c => c.id === creditor.customerId);
-      if (!customer) {
-        toast({
-          title: "Erro",
-          description: "Cliente não encontrado",
-          variant: "destructive"
-        });
-        return;
-      }
+  // const generateCarne = async (creditor: Creditor, installments: number) => {
+  //   try {
+  //     const customer = customers.find(c => c.id === creditor.customerId);
+  //     if (!customer) {
+  //       toast({
+  //         title: "Erro",
+  //         description: "Cliente não encontrado",
+  //         variant: "destructive"
+  //       });
+  //       return;
+  //     }
 
-      // Criar parcelas do carnê
-      const installmentValue = creditor.remainingAmount / installments;
-      const carneData = {
-        creditorId: creditor.id!,
-        creditorName: 'Sistema',
-        customerName: customer.name,
-        totalAmount: creditor.remainingAmount,
-        installments: installments,
-        installmentValue: installmentValue,
-        dueDate: new Date(creditor.dueDate)
-      };
+  //     // Criar parcelas do carnê
+  //     const installmentValue = creditor.remainingAmount / installments;
+  //     const carneData = {
+  //       creditorId: creditor.id!,
+  //       creditorName: 'Sistema',
+  //       customerName: customer.name,
+  //       totalAmount: creditor.remainingAmount,
+  //       installments: installments,
+  //       installmentValue: installmentValue,
+  //       dueDate: new Date(creditor.dueDate)
+  //     };
 
-      // Salvar parcelas no banco
-      const installmentPromises = [];
-      for (let i = 1; i <= installments; i++) {
-        const installmentDueDate = new Date(creditor.dueDate);
-        installmentDueDate.setMonth(installmentDueDate.getMonth() + (i - 1));
+  //     // Salvar parcelas no banco
+  //     const installmentPromises = [];
+  //     for (let i = 1; i <= installments; i++) {
+  //       const installmentDueDate = new Date(creditor.dueDate);
+  //       installmentDueDate.setMonth(installmentDueDate.getMonth() + (i - 1));
         
-        installmentPromises.push(db.carneInstallments.add({
-          creditorId: creditor.id!,
-          installmentNumber: i,
-          dueDate: installmentDueDate,
-          amount: installmentValue,
-          paid: false,
-          createdAt: new Date()
-        }));
-      }
+  //       installmentPromises.push(db.carneInstallments.add({
+  //         creditorId: creditor.id!,
+  //         installmentNumber: i,
+  //         dueDate: installmentDueDate,
+  //         amount: installmentValue,
+  //         paid: false,
+  //         createdAt: new Date()
+  //       }));
+  //     }
 
-      await Promise.all(installmentPromises);
+  //     await Promise.all(installmentPromises);
 
-      // Gerar PDF
-      const pdfDataUri = PDFGenerator.generateCarne(carneData);
+  //     // Gerar PDF
+  //     const pdfDataUri = PDFGenerator.generateCarne(carneData);
       
-      // Abrir PDF em nova janela
-      const newWindow = window.open();
-      if (newWindow) {
-        newWindow.document.write(`<iframe width='100%' height='100%' src='${pdfDataUri}'></iframe>`);
-      }
+  //     // Abrir PDF em nova janela
+  //     const newWindow = window.open();
+  //     if (newWindow) {
+  //       newWindow.document.write(`<iframe width='100%' height='100%' src='${pdfDataUri}'></iframe>`);
+  //     }
 
-      await loadCarneInstallments();
+  //     await loadCarneInstallments();
       
-      toast({
-        title: "Carnê gerado!",
-        description: `Carnê de ${installments} parcelas criado com sucesso`
-      });
+  //     toast({
+  //       title: "Carnê gerado!",
+  //       description: `Carnê de ${installments} parcelas criado com sucesso`
+  //     });
 
-      setShowCarneDialog(false);
-      setInstallmentsCount('');
-    } catch (error) {
-      console.error('Erro ao gerar carnê:', error);
+  //     setShowCarneDialog(false);
+  //     setInstallmentsCount('');
+  //   } catch (error) {
+  //     console.error('Erro ao gerar carnê:', error);
+  //     toast({
+  //       title: "Erro",
+  //       description: "Erro ao gerar carnê",
+  //       variant: "destructive"
+  //     });
+  //   }
+  // };
+const generateCarne = async (
+  creditor: Creditor,
+  installments: number,
+  via: "cliente" | "credor" | "ambos" = "cliente" // padrão para cliente
+) => {
+  try {
+    const customer = customers.find(c => c.id === creditor.customerId);
+    if (!customer) {
       toast({
         title: "Erro",
-        description: "Erro ao gerar carnê",
+        description: "Cliente não encontrado",
         variant: "destructive"
       });
+      return;
     }
-  };
+
+    // Criar parcelas do carnê
+    const installmentValue = creditor.remainingAmount / installments;
+    const carneData = {
+      creditorId: creditor.id!,
+      creditorName: 'Sistema',
+      customerName: customer.name,
+      totalAmount: creditor.remainingAmount,
+      installments: installments,
+      installmentValue: installmentValue,
+      dueDate: new Date(creditor.dueDate)
+    };
+
+    // Salvar parcelas no banco
+    const installmentPromises = [];
+    for (let i = 1; i <= installments; i++) {
+      const installmentDueDate = new Date(creditor.dueDate);
+      installmentDueDate.setMonth(installmentDueDate.getMonth() + (i - 1));
+      
+      installmentPromises.push(db.carneInstallments.add({
+        creditorId: creditor.id!,
+        installmentNumber: i,
+        dueDate: installmentDueDate,
+        amount: installmentValue,
+        paid: false,
+        createdAt: new Date()
+      }));
+    }
+    await Promise.all(installmentPromises);
+
+    // Gerar PDF conforme a via selecionada
+    const pdfDataUri = PDFGenerator.generateCarne(carneData, via);
+
+    // Abrir PDF em nova janela
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(
+        `<iframe width='100%' height='100%' src='${pdfDataUri}'></iframe>`
+      );
+    }
+
+    await loadCarneInstallments();
+    
+    toast({
+      title: "Carnê gerado!",
+      description: `Carnê de ${installments} parcelas criado com sucesso`
+    });
+
+    setShowCarneDialog(false);
+    setInstallmentsCount('');
+  } catch (error) {
+    console.error('Erro ao gerar carnê:', error);
+    toast({
+      title: "Erro",
+      description: "Erro ao gerar carnê",
+      variant: "destructive"
+    });
+  }
+};
 
   const markInstallmentAsPaid = async (installmentId: number) => {
     try {
@@ -788,21 +863,15 @@ const Credores = () => {
                 {creditor.status !== 'pago' && (
                   <>
                     <Button 
-                      // onClick={() => {
-                      //   setSelectedCreditorForCarne(creditor);
-                      //   setShowCarneDialog(true);
-                      // }}
+                      onClick={() => {
+                        setSelectedCreditorForCarne(creditor);
 
+                        // extrai parcelas antes do "x" no description
+                        const parcelas = getInstallmentsFromDescription(creditor.description || "");
+                        setInstallmentsCount(parcelas.toString());
 
-                       onClick={() => {
-    setSelectedCreditorForCarne(creditor);
-
-    // extrai parcelas antes do "x" no description
-    const parcelas = getInstallmentsFromDescription(creditor.description || "");
-    setInstallmentsCount(parcelas.toString());
-
-    setShowCarneDialog(true);
-  }}
+                        setShowCarneDialog(true);
+                      }}
                       size="sm"
                       variant="outline"
                       className="flex items-center space-x-1"
@@ -1012,8 +1081,55 @@ const Credores = () => {
           </p>
         )}
       </div>
+
+      <div className="flex flex-col space-y-2">
+  {/* Seleção da via */}
+  <div className="space-y-1">
+    <Label>Via do Carnê</Label>
+    <Select 
+      value={selectedVia} 
+      onValueChange={setSelectedVia}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Selecione a via" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="cliente">Via Cliente</SelectItem>
+        <SelectItem value="credor">Via Credor</SelectItem>
+        <SelectItem value="ambos">Ambas Vias</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Botões de ação */}
+  <div className="flex space-x-2">
+    <Button 
+      onClick={() => setShowCarneDialog(false)} 
+      variant="outline" 
+      className="flex-1"
+    >
+      Cancelar
+    </Button>
+    <Button 
+      onClick={() => {
+        if (selectedCreditorForCarne && installmentsCount && selectedVia) {
+          generateCarne(
+            selectedCreditorForCarne, 
+            parseInt(installmentsCount, 10),
+            selectedVia as "cliente" | "credor" | "ambos"
+          );
+        }
+      }}
+      disabled={!installmentsCount || parseInt(installmentsCount, 10) < 1 || !selectedVia}
+      className="flex-1"
+    >
+      Confirmar
+    </Button>
+  </div>
+</div>
+
       
-      <div className="flex space-x-2">
+      {/* <div className="flex space-x-2">
         <Button 
           onClick={() => setShowCarneDialog(false)} 
           variant="outline" 
@@ -1035,7 +1151,7 @@ const Credores = () => {
         >
           Confirmar
         </Button>
-      </div>
+      </div> */}
     </div>
   </DialogContent>
 </Dialog>
