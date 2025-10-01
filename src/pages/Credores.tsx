@@ -333,6 +333,7 @@ const generateCarne = async (
       paymentMethod: sale.paymentMethod,
       installments: sale.installments,
       createdAt: sale.createdAt,
+      deliveryDate: sale.createdAt,        // Data de entrega (usando data da venda)
       seller: user?.username || 'Desconhecido'
 };
 
@@ -1088,7 +1089,7 @@ const generateCarne = async (
     <Label>Via do Carnê</Label>
     <Select 
       value={selectedVia} 
-      onValueChange={setSelectedVia}
+      onValueChange={(value) => setSelectedVia(value as "cliente" | "credor" | "ambos" | "")}
     >
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Selecione a via" />
