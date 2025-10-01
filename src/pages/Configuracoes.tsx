@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/hooks/use-toast';
 import { db, seedDatabase } from '@/lib/database';
+import { DataMigration } from '@/components/DataMigration';
 import { 
   Settings, 
   Database, 
@@ -285,11 +286,14 @@ const handleExportData = async () => {
           </div>
         </Card>
 
+        {/* Cloud Migration */}
+        <DataMigration />
+
         {/* Database Management */}
         <Card className="p-6">
           <div className="flex items-center space-x-2 mb-4">
             <Database className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">Gerenciamento de Dados</h2>
+            <h2 className="text-xl font-semibold">Gerenciamento de Dados Locais</h2>
           </div>
           
           <div className="space-y-4">
