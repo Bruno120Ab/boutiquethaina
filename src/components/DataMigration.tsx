@@ -31,6 +31,11 @@ export const DataMigration = () => {
   };
 
   const migrateData = async () => {
+    // Confirmação antes de iniciar
+    if (!confirm('Tem certeza que deseja migrar todos os dados para o Lovable Cloud? Esta ação irá transferir todos os dados do armazenamento local para a nuvem.')) {
+      return;
+    }
+
     setIsMigrating(true);
     setProgress(0);
     setMigrationStatus([]);
@@ -58,13 +63,13 @@ export const DataMigration = () => {
       if (users.length > 0) {
         const { error: usersError } = await supabase
           .from('system_users')
-          .insert(users.map(u => ({
+          .upsert(users.map(u => ({
             id: u.id,
             username: u.username,
             password: u.password,
             role: u.role,
             created_at: u.createdAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (usersError) throw new Error(`Erro ao migrar usuários: ${usersError.message}`);
         updateStatus('system_users', { status: 'success', count: users.length });
@@ -80,7 +85,7 @@ export const DataMigration = () => {
       if (customers.length > 0) {
         const { error: customersError } = await supabase
           .from('customers')
-          .insert(customers.map(c => ({
+          .upsert(customers.map(c => ({
             id: c.id,
             name: c.name,
             phone: c.phone,
@@ -88,7 +93,7 @@ export const DataMigration = () => {
             address: c.address,
             cpf: c.cpf,
             created_at: c.createdAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (customersError) throw new Error(`Erro ao migrar clientes: ${customersError.message}`);
         updateStatus('customers', { status: 'success', count: customers.length });
@@ -104,7 +109,7 @@ export const DataMigration = () => {
       if (products.length > 0) {
         const { error: productsError } = await supabase
           .from('products')
-          .insert(products.map(p => ({
+          .upsert(products.map(p => ({
             id: p.id,
             name: p.name,
             price: p.price,
@@ -116,7 +121,7 @@ export const DataMigration = () => {
             min_stock: p.minStock,
             created_at: p.createdAt.toISOString(),
             updated_at: p.updatedAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (productsError) throw new Error(`Erro ao migrar produtos: ${productsError.message}`);
         updateStatus('products', { status: 'success', count: products.length });
@@ -132,7 +137,7 @@ export const DataMigration = () => {
       if (creditors.length > 0) {
         const { error: creditorsError } = await supabase
           .from('creditors')
-          .insert(creditors.map(c => ({
+          .upsert(creditors.map(c => ({
             id: c.id,
             customer_id: c.customerId,
             customer_name: c.customerName,
@@ -144,7 +149,7 @@ export const DataMigration = () => {
             status: c.status,
             created_at: c.createdAt.toISOString(),
             updated_at: c.updatedAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (creditorsError) throw new Error(`Erro ao migrar credores: ${creditorsError.message}`);
         updateStatus('creditors', { status: 'success', count: creditors.length });
@@ -160,7 +165,7 @@ export const DataMigration = () => {
       if (carneInstallments.length > 0) {
         const { error: carneError } = await supabase
           .from('carne_installments')
-          .insert(carneInstallments.map(c => ({
+          .upsert(carneInstallments.map(c => ({
             id: c.id,
             creditor_id: c.creditorId,
             installment_number: c.installmentNumber,
@@ -169,7 +174,7 @@ export const DataMigration = () => {
             paid: c.paid,
             paid_at: c.paidAt?.toISOString(),
             created_at: c.createdAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (carneError) throw new Error(`Erro ao migrar carnês: ${carneError.message}`);
         updateStatus('carne_installments', { status: 'success', count: carneInstallments.length });
@@ -185,7 +190,7 @@ export const DataMigration = () => {
       if (sales.length > 0) {
         const { error: salesError } = await supabase
           .from('sales')
-          .insert(sales.map(s => ({
+          .upsert(sales.map(s => ({
             id: s.id,
             items: s.items as any,
             total: s.total,
@@ -196,7 +201,7 @@ export const DataMigration = () => {
             installments: s.installments,
             installment_value: s.installmentValue,
             user_id: s.userId
-          })));
+          })), { onConflict: 'id' });
         
         if (salesError) throw new Error(`Erro ao migrar vendas: ${salesError.message}`);
         updateStatus('sales', { status: 'success', count: sales.length });
@@ -212,7 +217,7 @@ export const DataMigration = () => {
       if (stockMovements.length > 0) {
         const { error: stockError } = await supabase
           .from('stock_movements')
-          .insert(stockMovements.map(sm => ({
+          .upsert(stockMovements.map(sm => ({
             id: sm.id,
             product_id: sm.productId,
             product_name: sm.productName,
@@ -220,7 +225,7 @@ export const DataMigration = () => {
             quantity: sm.quantity,
             reason: sm.reason,
             created_at: sm.createdAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (stockError) throw new Error(`Erro ao migrar movimentações: ${stockError.message}`);
         updateStatus('stock_movements', { status: 'success', count: stockMovements.length });
@@ -236,7 +241,7 @@ export const DataMigration = () => {
       if (expenses.length > 0) {
         const { error: expensesError } = await supabase
           .from('expenses')
-          .insert(expenses.map(e => ({
+          .upsert(expenses.map(e => ({
             id: e.id,
             supplier: e.supplier,
             description: e.description,
@@ -245,7 +250,7 @@ export const DataMigration = () => {
             due_date: e.dueDate.toISOString(),
             paid: e.paid,
             created_at: e.createdAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (expensesError) throw new Error(`Erro ao migrar despesas: ${expensesError.message}`);
         updateStatus('expenses', { status: 'success', count: expenses.length });
@@ -261,7 +266,7 @@ export const DataMigration = () => {
       if (creditSales.length > 0) {
         const { error: creditSalesError } = await supabase
           .from('credit_sales')
-          .insert(creditSales.map(cs => ({
+          .upsert(creditSales.map(cs => ({
             id: cs.id,
             sale_id: cs.saleId,
             creditor_id: cs.creditorId,
@@ -271,7 +276,7 @@ export const DataMigration = () => {
             paid_date: cs.paidDate?.toISOString(),
             status: cs.status,
             created_at: cs.createdAt.toISOString()
-          })));
+          })), { onConflict: 'id' });
         
         if (creditSalesError) throw new Error(`Erro ao migrar vendas a crédito: ${creditSalesError.message}`);
         updateStatus('credit_sales', { status: 'success', count: creditSales.length });
@@ -287,7 +292,7 @@ export const DataMigration = () => {
       if (returns.length > 0) {
         const { error: returnsError } = await supabase
           .from('returns')
-          .insert(returns.map(r => ({
+          .upsert(returns.map(r => ({
             id: r.id,
             sale_id: r.saleId,
             items: r.items as any,
@@ -299,7 +304,7 @@ export const DataMigration = () => {
             processed_at: r.processedAt?.toISOString(),
             user_id: r.userId,
             customer_id: r.customerId
-          })));
+          })), { onConflict: 'id' });
         
         if (returnsError) throw new Error(`Erro ao migrar devoluções: ${returnsError.message}`);
         updateStatus('returns', { status: 'success', count: returns.length });
@@ -315,7 +320,7 @@ export const DataMigration = () => {
       if (exchanges.length > 0) {
         const { error: exchangesError } = await supabase
           .from('exchanges')
-          .insert(exchanges.map(e => ({
+          .upsert(exchanges.map(e => ({
             id: e.id,
             original_sale_id: e.originalSaleId,
             new_sale_id: e.newSaleId,
@@ -327,7 +332,7 @@ export const DataMigration = () => {
             processed_at: e.processedAt?.toISOString(),
             user_id: e.userId,
             customer_id: e.customerId
-          })));
+          })), { onConflict: 'id' });
         
         if (exchangesError) throw new Error(`Erro ao migrar trocas: ${exchangesError.message}`);
         updateStatus('exchanges', { status: 'success', count: exchanges.length });
