@@ -6,8 +6,18 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { db, Customer } from '@/lib/database';
+import { customersApi } from '@/lib/supabaseApi';
 import { formatPhone, formatCPF } from '@/lib/formatters';
+
+type Customer = {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  cpf?: string | null;
+  created_at: string;
+};
 import { 
   Users, 
   Plus, 
@@ -38,8 +48,8 @@ const Clientes = () => {
 
   const loadCustomers = async () => {
     try {
-      const allCustomers = await db.customers.orderBy('name').toArray();
-      setCustomers(allCustomers);
+      const allCustomers = await customersApi.readAll();
+      setCustomers(allCustomers.sort((a, b) => a.name.localeCompare(b.name)) as any);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       toast({
@@ -81,23 +91,20 @@ const Clientes = () => {
     try {
       const customerData = {
         name: name.trim(),
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
-        address: address.trim() || undefined,
-        cpf: cpf.trim() || undefined
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+        address: address.trim() || null,
+        cpf: cpf.trim() || null
       };
 
       if (editingCustomer) {
-        await db.customers.update(editingCustomer.id!, customerData);
+        await customersApi.update(editingCustomer.id, customerData);
         toast({
           title: "Cliente atualizado!",
           description: "As informações foram atualizadas com sucesso.",
         });
       } else {
-        await db.customers.add({
-          ...customerData,
-          createdAt: new Date()
-        });
+        await customersApi.create(customerData);
         toast({
           title: "Cliente adicionado!",
           description: `${name} foi adicionado com sucesso.`,
@@ -131,7 +138,7 @@ const Clientes = () => {
     if (!confirm('Tem certeza que deseja excluir este cliente?')) return;
     
     try {
-      await db.customers.delete(customerId);
+      await customersApi.delete(customerId);
       toast({
         title: "Cliente removido!",
         description: "O cliente foi removido com sucesso.",
@@ -284,7 +291,7 @@ const Clientes = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleDelete(customer.id!)}
+                  onClick={() => handleDelete(customer.id)}
                   className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
                 >
                   <Trash2 className="h-3 w-3" />

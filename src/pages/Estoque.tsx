@@ -7,7 +7,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { db, Product, StockMovement, Customer } from '@/lib/database';
+import { productsApi, stockMovementsApi, customersApi } from '@/lib/supabaseApi';
+
+type Product = {
+  id: number;
+  name: string;
+  price: number;
+  stock: number;
+  category: string;
+  barcode?: string | null;
+  description?: string | null;
+  supplier?: string | null;
+  min_stock: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type Customer = {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  cpf?: string | null;
+  created_at: string;
+};
 import { 
   Package, 
   Plus, 
@@ -33,7 +57,16 @@ const Estoque = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showZapDialog, setShowZapDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [newProduct, setNewProduct] = useState<Partial<Product>>({
+  const [newProduct, setNewProduct] = useState<{
+    name: string;
+    price?: number;
+    stock?: number;
+    category: string;
+    barcode?: string;
+    description?: string;
+    supplier?: string;
+    minStock?: number;
+  }>({
     name: '',
     price: 0,
     stock: 0,
@@ -68,7 +101,7 @@ const Estoque = () => {
 
   const loadCustomers = async () => {
     try {
-      const allCustomers = await db.customers.toArray();
+      const allCustomers = await customersApi.readAll();
       setCustomers(allCustomers);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -77,8 +110,8 @@ const Estoque = () => {
 
   const loadProducts = async () => {
     try {
-      const allProducts = await db.products.toArray();
-      setProducts(allProducts);
+      const allProducts = await productsApi.readAll();
+      setProducts(allProducts as any);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast({ title: "Erro", description: "Não foi possível carregar os produtos.", variant: "destructive" });
@@ -95,7 +128,7 @@ const Estoque = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const lowStockProducts = products.filter(p => p.stock <= p.minStock);
+  const lowStockProducts = products.filter(p => p.stock <= p.min_stock);
 
   const saveProduct = async () => {
     try {
@@ -104,17 +137,22 @@ const Estoque = () => {
         return;
       }
 
-      const productData: Product = {
-        ...(newProduct as Product),
-        updatedAt: new Date(),
-        createdAt: editingProduct ? editingProduct.createdAt : new Date()
+      const productData = {
+        name: newProduct.name,
+        price: newProduct.price,
+        stock: newProduct.stock || 0,
+        category: newProduct.category,
+        barcode: newProduct.barcode || null,
+        description: newProduct.description || null,
+        supplier: newProduct.supplier || null,
+        min_stock: newProduct.minStock || 5
       };
 
       if (editingProduct) {
-        await db.products.update(editingProduct.id!, productData);
+        await productsApi.update(editingProduct.id, productData);
         toast({ title: "Produto atualizado", description: "Produto atualizado com sucesso." });
       } else {
-        await db.products.add(productData);
+        await productsApi.create(productData);
         toast({ title: "Produto adicionado", description: "Produto adicionado com sucesso." });
       }
 
@@ -137,7 +175,7 @@ const Estoque = () => {
       barcode: '',
       description: '',
       supplier: '',
-      minStock: undefined
+      minStock: 5
     });
     setCost(undefined);
     setMargin(undefined);
@@ -157,19 +195,19 @@ const Estoque = () => {
 
   const adjustStock = async (productId: number, adjustment: number, reason: string) => {
     try {
-      const product = await db.products.get(productId);
+      const product = await productsApi.read(productId);
       if (!product) return;
       const newStock = Math.max(0, product.stock + adjustment);
-      await db.products.update(productId, { stock: newStock, updatedAt: new Date() });
-      const stockMovement: Omit<StockMovement, 'id'> = {
-        productId,
-        productName: product.name,
+      await productsApi.update(productId, { stock: newStock });
+      
+      const stockMovement = {
+        product_id: productId,
+        product_name: product.name,
         type: adjustment > 0 ? 'entrada' : adjustment < 0 ? 'saida' : 'ajuste',
         quantity: Math.abs(adjustment),
-        reason,
-        createdAt: new Date()
+        reason
       };
-      await db.stockMovements.add(stockMovement);
+      await stockMovementsApi.create(stockMovement as any);
       await loadProducts();
       toast({ title: "Estoque ajustado", description: `Estoque de ${product.name} ajustado.` });
     } catch (error) {
@@ -283,8 +321,8 @@ const Estoque = () => {
                   <td className="p-4 font-medium">R$ { formatCurrency(product.price)}</td>
                   <td className="p-4"><span className="font-medium">{product.stock}</span> <span className="text-xs text-muted-foreground">un.</span></td>
                   <td className="p-4">
-                    <Badge variant={product.stock <= 0 ? "destructive" : product.stock <= product.minStock ? "warning" : "success"}>
-                      {product.stock <= 0 ? "Sem estoque" : product.stock <= product.minStock ? "Estoque baixo" : "Normal"}
+                    <Badge variant={product.stock <= 0 ? "destructive" : product.stock <= product.min_stock ? "warning" : "success"}>
+                      {product.stock <= 0 ? "Sem estoque" : product.stock <= product.min_stock ? "Estoque baixo" : "Normal"}
                     </Badge>
                   </td>
                   <td className="p-4 flex items-center space-x-1">
