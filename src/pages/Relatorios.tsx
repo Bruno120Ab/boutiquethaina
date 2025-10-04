@@ -4,8 +4,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { db, Sale, StockMovement, User } from '@/lib/database';
+import { salesApi, stockMovementsApi, systemUsersApi } from '@/lib/supabaseApi';
 import { formatCurrency } from '@/lib/formatters';
+
+interface Sale {
+  id: number;
+  items: any;
+  total: number;
+  payment_method: string;
+  user_id: number;
+  created_at: string;
+}
+
+interface StockMovement {
+  id: number;
+  product_name: string;
+  type: string;
+  quantity: number;
+  created_at: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  role: string;
+}
 import { 
   BarChart3, 
   TrendingUp, 
@@ -33,9 +56,9 @@ const Relatorios = () => {
     try {
       setLoading(true);
       const [allSales, allMovements, allUsers] = await Promise.all([
-        db.sales.toArray(),
-        db.stockMovements.toArray(),
-        db.users.toArray()
+        salesApi.readAll(),
+        stockMovementsApi.readAll(),
+        systemUsersApi.readAll()
       ]);
       
       let filteredSales = filterByPeriod(allSales);
@@ -43,7 +66,7 @@ const Relatorios = () => {
       
       // Filtrar por vendedor
       if (selectedUserId !== 'all') {
-        filteredSales = filteredSales.filter(sale => sale.userId === parseInt(selectedUserId));
+        filteredSales = filteredSales.filter(sale => sale.user_id === parseInt(selectedUserId));
       }
       
       setSales(filteredSales);
@@ -69,7 +92,7 @@ const Relatorios = () => {
     const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     return data.filter(item => {
-      const itemDate = new Date(item.createdAt);
+      const itemDate = new Date(item.created_at);
       switch (period) {
         case 'today':
           return itemDate >= today;
@@ -90,7 +113,7 @@ const Relatorios = () => {
   const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
 
   const salesByPayment = sales.reduce((acc, sale) => {
-    acc[sale.paymentMethod] = (acc[sale.paymentMethod] || 0) + 1;
+    acc[sale.payment_method] = (acc[sale.payment_method] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
@@ -115,7 +138,7 @@ const Relatorios = () => {
 
   // Análise por vendedor
   const salesByUser = sales.reduce((acc, sale) => {
-    const user = users.find(u => u.id === sale.userId);
+    const user = users.find(u => u.id === sale.user_id);
     const userName = user?.username || 'Desconhecido';
     
     if (!acc[userName]) {
@@ -345,7 +368,7 @@ const Relatorios = () => {
                   className="flex items-center justify-between p-3 bg-muted rounded-lg"
                 >
                   <div className="flex flex-col">
-                    <span className="font-medium">{movement.productName}</span>
+                    <span className="font-medium">{movement.product_name}</span>
                     <span className="text-sm text-muted-foreground"></span>
                   </div>
                   <div className="flex items-center space-x-3">
@@ -420,13 +443,13 @@ const Relatorios = () => {
           <h3 className="text-lg font-semibold mb-4">Vendas Recentes</h3>
           <div className="space-y-3 max-h-80 overflow-y-auto">
             {sales.slice(0, 10).map((sale) => {
-              const user = users.find(u => u.id === sale.userId);
+              const user = users.find(u => u.id === sale.user_id);
               return (
                 <div key={sale.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div>
                     <p className="font-medium">Venda #{sale.id}</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(sale.createdAt).toLocaleString()}
+                      {new Date(sale.created_at).toLocaleString()}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {sale.items.length} {sale.items.length === 1 ? 'item' : 'itens'} • 
@@ -436,7 +459,7 @@ const Relatorios = () => {
                   <div className="text-right">
                     <p className="font-medium">{formatCurrency(sale.total)}</p>
                     <Badge variant="outline" className="text-xs">
-                      {sale.paymentMethod}
+                      {sale.payment_method}
                     </Badge>
                   </div>
                 </div>

@@ -5,9 +5,37 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
-import { db, Product, Sale, SaleItem, StockMovement, Customer } from '@/lib/database';
+import { productsApi, salesApi, stockMovementsApi, customersApi, creditorsApi } from '@/lib/supabaseApi';
 import { authService } from '@/lib/auth';
 import { formatCurrency } from '@/lib/formatters';
+
+interface SaleItem {
+  productId: number;
+  productName: string;
+  quantity: number;
+  price: number;
+  total: number;
+}
+
+interface CartItem extends SaleItem {
+  stock: number;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  price: number;
+  stock: number;
+  category: string;
+  barcode?: string | null;
+}
+
+interface Customer {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+}
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { 
@@ -45,8 +73,8 @@ const PDV = () => {
 
   const loadCustomers = async () => {
     try {
-      const allCustomers = await db.customers.toArray();
-      setCustomers(allCustomers);
+      const allCustomers = await customersApi.readAll();
+      setCustomers(allCustomers as any);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
     }
@@ -54,8 +82,8 @@ const PDV = () => {
 
   const loadProducts = async () => {
     try {
-      const allProducts = await db.products.toArray();
-      setProducts(allProducts);
+      const allProducts = await productsApi.readAll();
+      setProducts(allProducts as any);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast({
@@ -73,7 +101,7 @@ const PDV = () => {
   );
 
   const addToCart = (product: Product) => {
-    const existingItem = cart.find(item => item.productId === product.id!);
+    const existingItem = cart.find(item => item.productId === product.id);
     
     if (existingItem) {
       if (existingItem.quantity >= product.stock) {
@@ -84,7 +112,7 @@ const PDV = () => {
         });
         return;
       }
-      updateCartQuantity(product.id!, existingItem.quantity + 1);
+      updateCartQuantity(product.id, existingItem.quantity + 1);
     } else {
       if (product.stock <= 0) {
         toast({
@@ -96,7 +124,7 @@ const PDV = () => {
       }
       
       const newItem: CartItem = {
-        productId: product.id!,
+        productId: product.id,
         productName: product.name,
         quantity: 1,
         price: product.price,
@@ -173,7 +201,7 @@ const PDV = () => {
       }
 
       // Create sale record
-      const sale: Omit<Sale, 'id'> = {
+      const sale = {
         items: cart.map(item => ({
           productId: item.productId,
           productName: item.productName,
@@ -182,37 +210,32 @@ const PDV = () => {
           total: item.total
         })),
         total: getCartTotal(),
-        paymentMethod,
+        payment_method: paymentMethod,
         discount,
-        createdAt: new Date(),
-        userId: currentUser.id,
-        customerId: selectedCustomer,
-        installments: paymentMethod === 'crediario' ? installments : undefined,
-        installmentValue: paymentMethod === 'crediario' ? getCartTotal() / installments : undefined
+        user_id: currentUser.id,
+        customer_id: selectedCustomer,
+        installments: paymentMethod === 'crediario' ? installments : null,
+        installment_value: paymentMethod === 'crediario' ? getCartTotal() / installments : null
       };
 
-      const saleId = await db.sales.add(sale);
+      const createdSale = await salesApi.create(sale as any);
 
       // Update stock and create stock movements
       for (const item of cart) {
-        const product = await db.products.get(item.productId);
+        const product = await productsApi.read(item.productId);
         if (product) {
           const newStock = product.stock - item.quantity;
-          await db.products.update(item.productId, { 
-            stock: newStock,
-            updatedAt: new Date()
-          });
+          await productsApi.update(item.productId, { stock: newStock });
 
           // Create stock movement
-          const stockMovement: Omit<StockMovement, 'id'> = {
-            productId: item.productId,
-            productName: item.productName,
+          const stockMovement = {
+            product_id: item.productId,
+            product_name: item.productName,
             type: 'saida',
             quantity: item.quantity,
-            reason: `Venda #${saleId}`,
-            createdAt: new Date()
+            reason: `Venda #${createdSale.id}`
           };
-          await db.stockMovements.add(stockMovement);
+          await stockMovementsApi.create(stockMovement as any);
         }
       }
 
@@ -223,17 +246,15 @@ const PDV = () => {
           const dueDate = new Date();
           dueDate.setDate(dueDate.getDate() + 30); // Vencimento em 30 dias
 
-          await db.creditors.add({
-            customerId: selectedCustomer,
-            customerName: customer.name,
-            totalDebt: getCartTotal(),
-            paidAmount: 0,
-            remainingAmount: getCartTotal(),
-            dueDate: dueDate,
-            description: `Venda #${saleId} - ${installments}x ${formatCurrency(getCartTotal() / installments)}`,
-            status: 'pendente',
-            createdAt: new Date(),
-            updatedAt: new Date()
+          await creditorsApi.create({
+            customer_id: selectedCustomer,
+            customer_name: customer.name,
+            total_debt: getCartTotal(),
+            paid_amount: 0,
+            remaining_amount: getCartTotal(),
+            due_date: dueDate.toISOString(),
+            description: `Venda #${createdSale.id} - ${installments}x ${formatCurrency(getCartTotal() / installments)}`,
+            status: 'pendente'
           });
         }
       }
@@ -247,7 +268,7 @@ const PDV = () => {
 
       toast({
         title: "Venda finalizada!",
-        description: `Venda #${saleId} registrada com sucesso.`,
+        description: `Venda #${createdSale.id} registrada com sucesso.`,
         variant: "default",
       });
 
@@ -307,7 +328,7 @@ const PDV = () => {
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold text-sm">{product.name}</h3>
                   <Badge 
-                    variant={product.stock <= product.minStock ? "destructive" : "secondary"}
+                    variant={product.stock <= (product as any).min_stock ? "destructive" : "secondary"}
                     className="text-xs"
                   >
                     {product.stock} un.
