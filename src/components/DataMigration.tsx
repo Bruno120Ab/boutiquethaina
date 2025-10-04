@@ -55,7 +55,11 @@ export const DataMigration = () => {
     ];
 
     let completed = 0;
-
+const toIsoString = (value: any) => {
+  if (!value) return new Date().toISOString();
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+};
     try {
       // 1. Migrate system users
       updateStatus('system_users', { status: 'migrating' });
@@ -68,7 +72,7 @@ export const DataMigration = () => {
             username: u.username,
             password: u.password,
             role: u.role,
-            created_at: u.createdAt.toISOString()
+            created_at: toIsoString(u.createdAt)
           })), { onConflict: 'id' });
         
         if (usersError) throw new Error(`Erro ao migrar usuários: ${usersError.message}`);
@@ -92,7 +96,7 @@ export const DataMigration = () => {
             email: c.email,
             address: c.address,
             cpf: c.cpf,
-            created_at: c.createdAt.toISOString()
+            created_at: toIsoString(c.createdAt)
           })), { onConflict: 'id' });
         
         if (customersError) throw new Error(`Erro ao migrar clientes: ${customersError.message}`);
@@ -112,15 +116,16 @@ export const DataMigration = () => {
           .upsert(products.map(p => ({
             id: p.id,
             name: p.name,
-            price: p.price,
-            stock: p.stock,
+            price: Math.round(Number(p.price) * 100),
+            stock: Math.round(Number(p.stock) * 100),
             category: p.category,
             barcode: p.barcode,
             description: p.description,
             supplier: p.supplier,
             min_stock: p.minStock,
-            created_at: p.createdAt.toISOString(),
-            updated_at: p.updatedAt.toISOString()
+              created_at: toIsoString(p.createdAt),
+
+            updated_at: toIsoString(p.updatedAt)
           })), { onConflict: 'id' });
         
         if (productsError) throw new Error(`Erro ao migrar produtos: ${productsError.message}`);
@@ -141,9 +146,9 @@ export const DataMigration = () => {
             id: c.id,
             customer_id: c.customerId,
             customer_name: c.customerName,
-            total_debt: c.totalDebt,
-            paid_amount: c.paidAmount,
-            remaining_amount: c.remainingAmount,
+            total_debt:Math.round(Number(c.totalDebt) * 100),
+            paid_amount: Math.round(Number(c.paidAmount) * 100),
+            remaining_amount: Math.round(Number(c.remainingAmount) * 100),
             due_date: c.dueDate.toISOString(),
             description: c.description,
             status: c.status,
