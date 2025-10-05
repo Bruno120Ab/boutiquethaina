@@ -276,7 +276,7 @@ const Estoque = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <StatCard icon={<Package className="h-6 w-6 text-primary" />} title="Total de Produtos" value={products.length} />
         <StatCard icon={<AlertTriangle className="h-6 w-6 text-warning" />} title="Estoque Baixo" value={lowStockProducts.length} />
-        <StatCard icon={<TrendingUp className="h-6 w-6 text-success" />} title="Valor Total Estoque" value={`R$ ${ formatCurrency(products.reduce((sum, p) => sum + (p.price * p.stock), 0))}`} />
+        <StatCard icon={<TrendingUp className="h-6 w-6 text-success" />} title="Valor Total Estoque" value={` ${ formatCurrency(products.reduce((sum, p) => sum + (p.price * p.stock), 0))}`} />
       </div>
 
       {/* Filtros */}
@@ -305,7 +305,7 @@ const Estoque = () => {
               <tr className="text-left">
                 <th className="p-4 font-medium">Produto</th>
                 <th className="p-4 font-medium">Categoria</th>
-                <th className="p-4 font-medium">Preço</th>
+                <th className="p-4 font-medium">Preço(un)</th>
                 <th className="p-4 font-medium">Estoque</th>
                 <th className="p-4 font-medium">Status</th>
                 <th className="p-4 font-medium">Ações</th>
@@ -319,7 +319,7 @@ const Estoque = () => {
                     {product.barcode && <p className="text-xs text-muted-foreground">{product.barcode}</p>}
                   </td>
                   <td className="p-4"><Badge variant="outline">{product.category}</Badge></td>
-                  <td className="p-4 font-medium">R$ { formatCurrency(product.price)}</td>
+                  <td className="p-4 font-medium"> { formatCurrency(product.price)}</td>
                   <td className="p-4"><span className="font-medium">{product.stock}</span> <span className="text-xs text-muted-foreground">un.</span></td>
                   <td className="p-4">
                     <Badge variant={product.stock <= 0 ? "destructive" : product.stock <= product.min_stock ? "warning" : "success"}>
