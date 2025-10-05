@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Configuracoes = () => {
   const [loading, setLoading] = useState(false);
@@ -133,83 +134,332 @@ const handleExportData = async () => {
   }
 };
 
-  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+// ======= Adaptadores por tabela =======
+
+
+type IdMap = { [oldId: number]: number };
+
+// ===== Adaptadores =====
+const adaptProduct = (item: any) => ({
+  name: item.name,
+  price: Number(item.price),
+stock: Math.floor(Number(item.stock)),
+  category: item.category,
+  barcode: item.barcode,
+  description: item.description,
+  supplier: item.supplier,
+  min_stock: Math.floor(Number(item.minStock)), // INTEGER seguro
+  created_at: item.createdAt,
+  updated_at: item.updatedAt,
+});
+
+const adaptUser = (item: any) => ({
+  username: item.username,
+  password: item.password,
+  role: item.role,
+  created_at: item.createdAt,
+});
+
+const adaptCustomer = (item: any) => ({
+  name: item.name,
+  phone: item.phone,
+  email: item.email,
+  address: item.address,
+  cpf: item.cpf,
+  created_at: item.createdAt,
+});
+
+const adaptSale = (
+  item: any,
+  productIdMap: IdMap,
+  customerIdMap: IdMap,
+  userIdMap: IdMap
+) => ({
+  items: item.items.map((i: any) => ({
+    ...i,
+    product_id: productIdMap[i.productId],
+    price: Number(i.price),
+  })),
+  total: Number(item.total),
+  payment_method: item.payment_method ?? item.paymentMethod, // garante compatibilidade
+  discount: Number(item.discount),
+  customer_id: customerIdMap[item.customerId],
+  user_id: userIdMap[item.userId],
+  installments: Math.floor(Number(item.installments)),
+  installment_value: Number(item.installmentValue),
+  created_at: item.createdAt,
+});
+
+
+
+const adaptStockMovement = (item: any, productIdMap: IdMap) => ({
+  product_id: productIdMap[item.productId],
+  product_name: item.productName,
+  type: item.type,
+quantity: Math.floor(Number(item.quantity)),
+  reason: item.reason,
+  created_at: item.createdAt,
+});
+
+const adaptCreditor = (item: any, customerIdMap: IdMap) => ({
+  customer_id: customerIdMap[item.customerId],
+  customer_name: item.customerName,
+  total_debt: Number(item.totalDebt),
+  paid_amount: Number(item.paidAmount),
+  remaining_amount: Number(item.remainingAmount),
+  due_date: item.dueDate,
+  description: item.description,
+  status: item.status,
+  created_at: item.createdAt,
+  updated_at: item.updatedAt,
+});
+
+const adaptCarneInstallment = (item: any, creditorIdMap: IdMap) => ({
+  creditor_id: creditorIdMap[item.creditorId],
+  installment_number: item.installmentNumber,
+  due_date: item.dueDate,
+  amount: Number(item.amount),
+  paid: Boolean(item.paid),
+  paid_at: item.paidAt,
+  created_at: item.createdAt,
+});
+
+const adaptCreditSale = (item: any, saleIdMap: IdMap, creditorIdMap: IdMap) => ({
+  sale_id: saleIdMap[item.saleId],
+  creditor_id: creditorIdMap[item.creditorId],
+  installment_number: item.installmentNumber,
+  installment_value: Number(item.installmentValue),
+  due_date: item.dueDate,
+  paid_date: item.paidDate,
+  status: item.status,
+  created_at: item.createdAt,
+});
+
+const adaptReturn = (item: any, saleIdMap: IdMap, customerIdMap: IdMap, userIdMap: IdMap) => ({
+  sale_id: saleIdMap[item.saleId],
+  items: item.items.map((i: any) => ({
+    ...i,
+    product_id: i.productId,
+  })),
+  type: item.type,
+  reason: item.reason,
+  total_refund: Number(item.totalRefund),
+  status: item.status,
+  created_at: item.createdAt,
+  processed_at: item.processedAt,
+  user_id: userIdMap[item.userId],
+  customer_id: customerIdMap[item.customerId],
+});
+
+const adaptExchange = (item: any, saleIdMap: IdMap, customerIdMap: IdMap, userIdMap: IdMap) => ({
+  original_sale_id: saleIdMap[item.originalSaleId],
+  new_sale_id: saleIdMap[item.newSaleId],
+  returned_items: item.returnedItems.map((i: any) => ({ ...i, product_id: i.productId })),
+  new_items: item.newItems.map((i: any) => ({ ...i, product_id: i.productId })),
+  reason: item.reason,
+  status: item.status,
+  created_at: item.createdAt,
+  processed_at: item.processedAt,
+  user_id: userIdMap[item.userId],
+  customer_id: customerIdMap[item.customerId],
+});
+
+const adaptExpense = (item: any) => ({
+  supplier: item.supplier,
+  description: item.description,
+  category: item.category,
+  amount: Number(item.amount),
+  due_date: item.dueDate,
+  paid: Boolean(item.paid),
+  created_at: item.createdAt,
+});
+
+// ===== Função principal =====
+const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
   const file = event.target.files?.[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
+      // Limpar todas as tabelas antes de importar
+await supabase.from('credit_sales').delete().neq('id', 0);
+await supabase.from('carne_installments').delete().neq('id', 0);
+await supabase.from('exchanges').delete().neq('id', 0);
+await supabase.from('returns').delete().neq('id', 0);
+await supabase.from('stock_movements').delete().neq('id', 0);
+await supabase.from('expenses').delete().neq('id', 0);
+await supabase.from('sales').delete().neq('id', 0);
+await supabase.from('creditors').delete().neq('id', 0);
+await supabase.from('customers').delete().neq('id', 0);
+await supabase.from('products').delete().neq('id', 0);
+await supabase.from('system_users').delete().neq('id', 0);
+
       setLoading(true);
       const data = JSON.parse(e.target?.result as string);
 
-      if (data.products) {
-        await db.products.clear();
-        await db.products.bulkAdd(data.products);
-      }
+      const customerIdMap: IdMap = {};
+      const userIdMap: IdMap = {};
+      const productIdMap: IdMap = {};
+      const saleIdMap: IdMap = {};
+      const creditorIdMap: IdMap = {};
 
-      if (data.sales) {
-        await db.sales.clear();
-        await db.sales.bulkAdd(data.sales);
-      }
-
-      if (data.stockMovements) {
-        await db.stockMovements.clear();
-        await db.stockMovements.bulkAdd(data.stockMovements);
-      }
-
+      // ===== 1. System Users =====
       if (data.users) {
-        await db.users.clear();
-        await db.users.bulkAdd(data.users);
+        await supabase.from('system_users').delete().neq('id', 0);
+        for (const user of data.users) {
+          const { data: newUser, error } = await supabase
+            .from('system_users')
+            .insert([adaptUser(user)])
+            .select('id')
+            .single();
+          if (error) throw error;
+          userIdMap[user.id] = newUser.id;
+        }
       }
 
+      // ===== 2. Customers =====
       if (data.customers) {
-        await db.customers.clear();
-        await db.customers.bulkAdd(data.customers);
+        await supabase.from('customers').delete().neq('id', 0);
+        for (const customer of data.customers) {
+          const { data: newCustomer, error } = await supabase
+            .from('customers')
+            .insert([adaptCustomer(customer)])
+            .select('id')
+            .single();
+          if (error) throw error;
+          customerIdMap[customer.id] = newCustomer.id;
+        }
       }
 
+      // ===== 3. Products =====
+      if (data.products) {
+        await supabase.from('products').delete().neq('id', 0);
+        for (const product of data.products) {
+          const { data: newProduct, error } = await supabase
+            .from('products')
+            .insert([adaptProduct(product)])
+            .select('id')
+            .single();
+          if (error) throw error;
+          productIdMap[product.id] = newProduct.id;
+        }
+      }
+
+      // ===== 4. Sales =====
+      if (data.sales) {
+        await supabase.from('sales').delete().neq('id', 0);
+        for (const sale of data.sales) {
+          const { data: newSale, error } = await supabase
+            .from('sales')
+            .insert([adaptSale(sale, productIdMap, customerIdMap, userIdMap)])
+            .select('id')
+            .single();
+          if (error) throw error;
+          saleIdMap[sale.id] = newSale.id;
+        }
+      }
+
+      // ===== 5. Stock Movements =====
+      if (data.stockMovements) {
+        await supabase.from('stock_movements').delete().neq('id', 0);
+        for (const movement of data.stockMovements) {
+          const { error } = await supabase
+            .from('stock_movements')
+            .insert([adaptStockMovement(movement, productIdMap)]);
+          if (error) throw error;
+        }
+      }
+
+      // ===== 6. Creditors =====
       if (data.creditors) {
-        await db.creditors.clear();
-        await db.creditors.bulkAdd(data.creditors);
+        await supabase.from('creditors').delete().neq('id', 0);
+        for (const creditor of data.creditors) {
+          const { data: newCreditor, error } = await supabase
+            .from('creditors')
+            .insert([adaptCreditor(creditor, customerIdMap)])
+            .select('id')
+            .single();
+          if (error) throw error;
+          creditorIdMap[creditor.id] = newCreditor.id;
+        }
       }
 
+      // ===== 7. Carne Installments =====
+      if (data.carneInstallments) {
+        await supabase.from('carne_installments').delete().neq('id', 0);
+        for (const carne of data.carneInstallments) {
+          const { error } = await supabase
+            .from('carne_installments')
+            .insert([adaptCarneInstallment(carne, creditorIdMap)]);
+          if (error) throw error;
+        }
+      }
+
+      // ===== 8. Credit Sales =====
       if (data.creditSales) {
-        await db.creditSales.clear();
-        await db.creditSales.bulkAdd(data.creditSales);
+        await supabase.from('credit_sales').delete().neq('id', 0);
+        for (const cs of data.creditSales) {
+          const { error } = await supabase
+            .from('credit_sales')
+            .insert([adaptCreditSale(cs, saleIdMap, creditorIdMap)]);
+          if (error) throw error;
+        }
       }
 
+      // ===== 9. Returns =====
       if (data.returns) {
-        await db.returns.clear();
-        await db.returns.bulkAdd(data.returns);
+        await supabase.from('returns').delete().neq('id', 0);
+        for (const ret of data.returns) {
+          const { error } = await supabase
+            .from('returns')
+            .insert([adaptReturn(ret, saleIdMap, customerIdMap, userIdMap)]);
+          if (error) throw error;
+        }
       }
 
-      if (data.expenses) {
-        await db.expenses.clear();
-        await db.expenses.bulkAdd(data.expenses);
-      }
-
+      // ===== 10. Exchanges =====
       if (data.exchanges) {
-        await db.exchanges.clear();
-        await db.exchanges.bulkAdd(data.exchanges);
+        await supabase.from('exchanges').delete().neq('id', 0);
+        for (const ex of data.exchanges) {
+          const { error } = await supabase
+            .from('exchanges')
+            .insert([adaptExchange(ex, saleIdMap, customerIdMap, userIdMap)]);
+          if (error) throw error;
+        }
+      }
+
+      // ===== 11. Expenses =====
+      if (data.expenses) {
+        await supabase.from('expenses').delete().neq('id', 0);
+        for (const exp of data.expenses) {
+          const { error } = await supabase
+            .from('expenses')
+            .insert([adaptExpense(exp)]);
+          if (error) throw error;
+        }
       }
 
       toast({
-        title: "Backup restaurado",
-        description: "Todos os dados foram importados com sucesso.",
+        title: 'Backup restaurado',
+        description: 'Todos os dados foram importados com sucesso.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao importar dados:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível importar os dados. Verifique o arquivo.",
-        variant: "destructive",
+        title: 'Erro',
+        description:
+          error.message || 'Não foi possível importar os dados. Verifique o arquivo JSON.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
+
   reader.readAsText(file);
-  };
+};
+
 
   const handleClearData = async () => {
     if (!confirm('Tem certeza que deseja apagar TODOS os dados? Esta ação não pode ser desfeita.')) {

@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { setupPWAInstallPrompt } from '@/pwa';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CartItem extends SaleItem {
   stock: number;
@@ -65,6 +66,7 @@ const PDV = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
   const [installments, setInstallments] = useState(1);
+const [isCartOpen, setIsCartOpen] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -199,6 +201,17 @@ const PDV = () => {
         });
         return;
       }
+      console.log(currentUser)
+      const { data: systemUser, error } = await supabase
+        .from('system_users')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (!systemUser) {
+        console.error('Usuário não encontrado na tabela system_users', error);
+        return;
+      }
 
       // Create sale record
       const sale = {
@@ -212,7 +225,7 @@ const PDV = () => {
         total: getCartTotal(),
         payment_method: paymentMethod,
         discount,
-        user_id: currentUser.id,
+        user_id: Number(currentUser.id),
         customer_id: selectedCustomer,
         installments: paymentMethod === 'crediario' ? installments : null,
         installment_value: paymentMethod === 'crediario' ? getCartTotal() / installments : null
@@ -290,228 +303,232 @@ const PDV = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Ponto de Venda</h1>
-        <div className="flex items-center space-x-4">
-          <Badge variant="outline" className="text-sm">
-            {products.length} produtos cadastrados
-          </Badge>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Products Section */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card className="p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, código de barras ou categoria..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-            {filteredProducts.map((product) => (
-              <Card
-                key={product.id}
-                className={cn(
-                  "p-4 cursor-pointer transition-all hover:shadow-md",
-                  product.stock <= 0 && "opacity-50"
-                )}
-                onClick={() => addToCart(product)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-sm">{product.name}</h3>
-                  <Badge 
-                    variant={product.stock <= (product as any).min_stock ? "destructive" : "secondary"}
-                    className="text-xs"
-                  >
-                    {product.stock} un.
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mb-2">{product.category}</p>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold text-primary">
-                    {formatCurrency(product.price)}
-                  </span>
-                  {product.stock > 0 && (
-                    <Plus className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </div>
-              </Card>
-            ))}
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-foreground">Ponto de Venda</h1>
+          <div className="flex items-center space-x-4">
+            <Badge variant="outline" className="text-sm">
+              {products.length} produtos cadastrados
+            </Badge>
           </div>
         </div>
 
-        {/* Cart Section */}
-        <div className="space-y-4">
-          <Card className="p-4">
-            <div className="flex items-center space-x-2 mb-4">
-              <ShoppingBag className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-bold">Carrinho</h2>
-              <Badge variant="secondary">{cart.length}</Badge>
-            </div>
-
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {cart.map((item) => (
-                <div key={item.productId} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.productName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatCurrency(item.price)} cada
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 w-6 p-0"
-                      onClick={() => updateCartQuantity(item.productId, item.quantity - 1)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="text-sm min-w-[2rem] text-center">{item.quantity}</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 w-6 p-0"
-                      onClick={() => updateCartQuantity(item.productId, item.quantity + 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 w-6 p-0 ml-2"
-                      onClick={() => removeFromCart(item.productId)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {cart.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">
-                Carrinho vazio
-              </p>
-            )}
-          </Card>
-
-          {cart.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Products Section */}
+          <div className="lg:col-span-2 space-y-4">
             <Card className="p-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span>{formatCurrency(cart.reduce((sum, item) => sum + item.total, 0))}</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm">Desconto:</label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={discount || ''}
-                      onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                      className="h-8 text-sm"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total:</span>
-                  <span className="text-primary">{formatCurrency(getCartTotal())}</span>
-                </div>
-                </div>
-
-                {/* Cliente */}
-                {paymentMethod === 'crediario' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="customer">Cliente *</Label>
-                    <Select value={selectedCustomer?.toString() || ''} onValueChange={(value) => setSelectedCustomer(Number(value))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {customers.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id!.toString()}>
-                            {customer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Forma de pagamento:</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {paymentMethods.map((method) => {
-                      const Icon = method.icon;
-                      return (
-                        <Button
-                          key={method.id}
-                          variant={paymentMethod === method.id ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            setPaymentMethod(method.id);
-                            if (method.id !== 'crediario') {
-                              setSelectedCustomer(null);
-                              setInstallments(1);
-                            }
-                          }}
-                          className="flex flex-col items-center p-2 h-auto"
-                        >
-                          <Icon className="h-4 w-4 mb-1" />
-                          <span className="text-xs">{method.label}</span>
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Parcelamento */}
-                {paymentMethod === 'crediario' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="installments">Parcelas</Label>
-                    <Select value={installments.toString()} onValueChange={(value) => setInstallments(Number(value))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5, 6].map((num) => (
-                          <SelectItem key={num} value={num.toString()}>
-                            {num}x de {formatCurrency(getCartTotal() / num)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <Button 
-                  onClick={finalizeSale}
-                  className="w-full"
-                  size="lg"
-                >
-                  Finalizar Venda
-                </Button>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, código de barras ou categoria..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             </Card>
-          )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
+              {filteredProducts.map((product) => (
+                <Card
+                  key={product.id}
+                  className={cn(
+                    "p-4 cursor-pointer transition-all hover:shadow-md",
+                    product.stock <= 0 && "opacity-50"
+                  )}
+                  onClick={() => addToCart(product)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-semibold text-sm">{product.name}</h3>
+                    <Badge 
+                      variant={product.stock <= (product as any).min_stock ? "destructive" : "secondary"}
+                      className="text-xs"
+                    >
+                      {product.stock} un.
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">{product.category}</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-primary">
+                      {formatCurrency(product.price)}
+                    </span>
+                    {product.stock > 0 && (
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Cart Section */}
+          <div className="space-y-4">
+            <Card className="p-4">
+              <div className="flex items-center space-x-2 mb-4">
+                <ShoppingBag className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-bold">Carrinho</h2>
+                <Badge variant="secondary">{cart.length}</Badge>
+              </div>
+
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {cart.map((item) => (
+                  <div key={item.productId} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.productName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(item.price)} cada
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 w-6 p-0"
+                        onClick={() => updateCartQuantity(item.productId, item.quantity - 1)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="text-sm min-w-[2rem] text-center">{item.quantity}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 w-6 p-0"
+                        onClick={() => updateCartQuantity(item.productId, item.quantity + 1)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 w-6 p-0 ml-2"
+                        onClick={() => removeFromCart(item.productId)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {cart.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">
+                  Carrinho vazio
+                </p>
+              )}
+            </Card>
+
+            {cart.length > 0 && (
+              <Card className="p-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(cart.reduce((sum, item) => sum + item.total, 0))}</span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm">Desconto:</label>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={discount || ''}
+                        onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                        className="h-8 text-sm"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    
+                    <Separator />
+                    
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span className="text-primary">{formatCurrency(getCartTotal())}</span>
+                  </div>
+                  </div>
+
+                  {/* Cliente */}
+                  {paymentMethod === 'crediario' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="customer">Cliente *</Label>
+                      <Select value={selectedCustomer?.toString() || ''} onValueChange={(value) => setSelectedCustomer(Number(value))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um cliente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customers.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id!.toString()}>
+                              {customer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Forma de pagamento:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {paymentMethods.map((method) => {
+                        const Icon = method.icon;
+                        return (
+                          <Button
+                            key={method.id}
+                            variant={paymentMethod === method.id ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              setPaymentMethod(method.id);
+                              if (method.id !== 'crediario') {
+                                setSelectedCustomer(null);
+                                setInstallments(1);
+                              }
+                            }}
+                            className="flex flex-col items-center p-2 h-auto"
+                          >
+                            <Icon className="h-4 w-4 mb-1" />
+                            <span className="text-xs">{method.label}</span>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Parcelamento */}
+                  {paymentMethod === 'crediario' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="installments">Parcelas</Label>
+                      <Select value={installments.toString()} onValueChange={(value) => setInstallments(Number(value))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6].map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num}x de {formatCurrency(getCartTotal() / num)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={finalizeSale}
+                    className="w-full"
+                    size="lg"
+                  >
+                    Finalizar Venda
+                  </Button>
+                </div>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+ 
+
+
   );
 };
 

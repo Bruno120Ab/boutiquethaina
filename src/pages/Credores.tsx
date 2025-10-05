@@ -35,6 +35,8 @@ interface Customer {
   name: string;
   phone?: string | null;
   email?: string | null;
+   cpf: string;        // CPF do cliente
+  address: string;   
 }
 
 interface CarneInstallment {
@@ -45,6 +47,7 @@ interface CarneInstallment {
   amount: number;
   paid: boolean;
   paid_at?: string | null;
+  // address: string
 }
 import { 
   Users, 
@@ -65,6 +68,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const Credores = () => {
   const [creditors, setCreditors] = useState<Creditor[]>([]);
@@ -351,26 +355,34 @@ const generateCarne = async (
       }
 
       // Contar carnês gerados
-      const carneCount = carneInstallments.filter(c => c.creditorId === creditor.id).length;
+      const carneCount = carneInstallments.filter(c => c.creditor_id === creditor.id).length;
 
-      const saleData = {
-      saleId: sale.id!,
-      customerName: customer.name,
-      customerCPF: customer.cpf,           // CPF do cliente
-      customerAddress: customer.address,   // Endereço do cliente
-      customerPhone: customer.phone,       // Telefone do cliente
-      items: sale.items,
-      total: sale.total,
-      discount: sale.discount,
-      paymentMethod: sale.paymentMethod,
-      installments: sale.installments,
-      createdAt: sale.createdAt,
-      deliveryDate: sale.createdAt,        // Data de entrega (usando data da venda)
-      seller: user?.username || 'Desconhecido'
+     const saleItems = Array.isArray(sale.items)
+  ? sale.items.map((item: any) => ({
+      productName: item.productName || item.name, // adapte conforme seu campo
+      quantity: item.quantity,
+      price: item.price
+    }))
+  : []; // fallback caso não seja array
+
+// 2. Converter datas para Date
+const saleData = {
+  saleId: sale.id!,
+  customerName: customer.name,
+  customerCPF: customer.cpf,
+  customerAddress: customer.address,
+  customerPhone: customer.phone,
+  items: saleItems,                 // array no formato correto
+  total: sale.total,
+  discount: sale.discount,
+  paymentMethod: sale.payment_method,
+  installments: sale.installments,
+  createdAt: new Date(sale.created_at),      // converter para Date
+  deliveryDate: new Date(sale.created_at),   // ou outro campo de entrega
+  seller: user?.username || 'Desconhecido'
 };
 
-      // Gerar PDF do relatório de venda
-      const pdfDataUri = PDFGenerator.generateSaleReport(saleData);
+const pdfDataUri = PDFGenerator.generateSaleReport(saleData);
       
       // Abrir PDF em nova janela
       const newWindow = window.open();
@@ -497,28 +509,81 @@ const generateCarne = async (
         updatedAt: new Date()
       };
 
-      if (editingCreditor) {
-        await db.creditors.update(editingCreditor.id!, {
-          ...creditorData,
-          paidAmount: editingCreditor.paidAmount,
-          remainingAmount: debtValue - editingCreditor.paidAmount
-        });
+      // if (editingCreditor) {
+      //   await db.creditors.update(editingCreditor.id!, {
+      //     ...creditorData,
+      //     paidAmount: editingCreditor.paid_amount,
+      //     remainingAmount: debtValue - editingCreditor.paid_amount
+      //   });
         
-        toast({
-          title: "Credor atualizado!",
-          description: "As informações foram atualizadas com sucesso.",
-        });
-      } else {
-        await db.creditors.add({
-          ...creditorData,
-          createdAt: new Date()
-        });
+      //   toast({
+      //     title: "Credor atualizado!",
+      //     description: "As informações foram atualizadas com sucesso.",
+      //   });
+      // } else {
+      //   await db.creditors.add({
+      //     ...creditorData,
+      //     createdAt: new Date()
+      //   });
         
-        toast({
-          title: "Credor adicionado!",
-          description: `${customer.name} foi adicionado à agenda de credores.`,
-        });
-      }
+      //   toast({
+      //     title: "Credor adicionado!",
+      //     description: `${customer.name} foi adicionado à agenda de credores.`,
+      //   });
+      // }
+if (editingCreditor) {
+  const { error } = await supabase
+    .from('creditors')
+    .update({
+      ...creditorData,
+      paid_amount: editingCreditor.paid_amount,              // note que o nome do campo muda
+      remaining_amount: debtValue - editingCreditor.paid_amount
+    })
+    .eq('id', editingCreditor.id);
+
+  if (error) {
+    toast({
+      title: "Erro",
+      description: "Não foi possível atualizar o credor.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  toast({
+    title: "Credor atualizado!",
+    description: "As informações foram atualizadas com sucesso.",
+  });
+} else {
+  const { error } = await supabase
+    .from('creditors')
+    .insert([{
+    customer_id: creditorData.customerId,
+    customer_name: creditorData.customerName,
+    total_debt: creditorData.totalDebt,
+    paid_amount: creditorData.paidAmount,
+    remaining_amount: creditorData.remainingAmount,
+    due_date: new Date(creditorData.dueDate).toISOString(), // transforma em string
+    description: creditorData.description,
+    status: creditorData.status,
+    created_at: new Date().toISOString(),  // transforma em string
+    updated_at: new Date().toISOString()
+  }]);;
+
+  if (error) {
+    toast({
+      title: "Erro",
+      description: "Não foi possível adicionar o credor.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  toast({
+    title: "Credor adicionado!",
+    description: `${customer.name} foi adicionado à agenda de credores.`,
+  });
+}
 
       setIsDialogOpen(false);
       resetForm();
@@ -535,10 +600,10 @@ const generateCarne = async (
 
   const handleEdit = (creditor: Creditor) => {
     setEditingCreditor(creditor);
-    setSelectedCustomer(creditor.customerId.toString());
-    setTotalDebt(creditor.totalDebt.toString());
+    setSelectedCustomer(creditor.customer_id.toString());
+    setTotalDebt(creditor.total_debt.toString());
     setDescription(creditor.description);
-    setDueDate(new Date(creditor.dueDate).toISOString().split('T')[0]);
+    setDueDate(new Date(creditor.due_date).toISOString().split('T')[0]);
     setIsDialogOpen(true);
   };
 
@@ -572,7 +637,7 @@ const generateCarne = async (
       
       toast({
         title: "Pagamento registrado!",
-        description: `${creditor.customerName} quitou a dívida.`,
+        description: `${creditor.customer_name} quitou a dívida.`,
       });
       
       loadCreditors();
@@ -597,54 +662,54 @@ const generateCarne = async (
     }
 
     try {
-      const creditorInstallments = carneInstallments.filter(c => c.creditorId === creditor.id);
+      const creditorInstallments = carneInstallments.filter(c => c.creditor_id === creditor.id);
       
       // Gerar carnê em PDF
       const carneInfo = {
         creditorId: creditor.id!,
         creditorName: "Sua Empresa",
-        customerName: creditor.customerName,
-        totalAmount: creditor.totalDebt,
+        customerName: creditor.customer_name,
+        totalAmount: creditor.total_debt,
         installments: creditorInstallments.length || 1,
-        installmentValue: creditor.totalDebt / (creditorInstallments.length || 1),
-        dueDate: new Date(creditor.dueDate),
+        installmentValue: creditor.total_debt / (creditorInstallments.length || 1),
+        dueDate: new Date(creditor.due_date),
         saleId: creditor.id
       };
 
       const carneData = PDFGenerator.generateCarne(carneInfo);
 
       // Dados para enviar ao Zapier
-      const zapierData = {
-        timestamp: new Date().toISOString(),
-        triggered_from: window.location.origin,
-        type: 'carne',
-        creditor: {
-          id: creditor.id,
-          customerName: creditor.customerName,
-          totalDebt: creditor.totalDebt,
-          remainingAmount: creditor.remainingAmount,
-          dueDate: creditor.dueDate,
-          description: creditor.description,
-          status: creditor.status
-        },
-        installments: creditorInstallments.map(inst => ({
-          number: inst.installmentNumber,
-          amount: inst.amount,
-          dueDate: inst.dueDate,
-          paid: inst.paid
-        })),
-        carneData: carneData,
-        message: customMessage || `Carnê para ${creditor.customerName} - ${formatCurrency(creditor.remainingAmount)} em aberto`
-      };
+      // const zapierData = {
+      //   timestamp: new Date().toISOString(),
+      //   triggered_from: window.location.origin,
+      //   type: 'carne',
+      //   creditor: {
+      //     id: creditor.id,
+      //     customerName: creditor.customerName,
+      //     totalDebt: creditor.totalDebt,
+      //     remainingAmount: creditor.remainingAmount,
+      //     dueDate: creditor.dueDate,
+      //     description: creditor.description,
+      //     status: creditor.status
+      //   },
+      //   installments: creditorInstallments.map(inst => ({
+      //     number: inst.installmentNumber,
+      //     amount: inst.amount,
+      //     dueDate: inst.dueDate,
+      //     paid: inst.paid
+      //   })),
+      //   carneData: carneData,
+      //   message: customMessage || `Carnê para ${creditor.customerName} - ${formatCurrency(creditor.remainingAmount)} em aberto`
+      // };
 
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        mode: "no-cors",
-        body: JSON.stringify(zapierData),
-      });
+      // const response = await fetch(webhookUrl, {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   mode: "no-cors",
+      //   body: JSON.stringify(zapierData),
+      // });
 
       toast({
         title: "Carnê enviado!",
@@ -843,7 +908,7 @@ const generateCarne = async (
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="font-semibold text-lg">{creditor.customerName}</h3>
+                  <h3 className="font-semibold text-lg">{creditor.customer_name}</h3>
                   <Badge 
                     variant={getStatusVariant(creditor.status)}
                     className="flex items-center space-x-1"
@@ -856,12 +921,12 @@ const generateCarne = async (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Valor Total</p>
-                    <p className="font-medium">{formatCurrency(creditor.totalDebt)}</p>
+                    <p className="font-medium">{formatCurrency(creditor.remaining_amount)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Valor Restante</p>
                     <p className="font-medium text-warning">
-                      {formatCurrency(getCreditorStats(creditor.id!).totalRemaining || creditor.remainingAmount)}
+                      {formatCurrency(getCreditorStats(creditor.id!).totalRemaining || creditor.remaining_amount)}
                     </p>
                   </div>
                   <div>
@@ -872,7 +937,7 @@ const generateCarne = async (
                     )}>
                       {(() => {
                         const nextDue = getNextDueDate(creditor.id!);
-                        return nextDue ? formatDate(new Date(nextDue)) : formatDate(new Date(creditor.dueDate));
+                        return nextDue ? formatDate(new Date(nextDue)) : formatDate(new Date(creditor.due_date));
                       })()}
                     </p>
                   </div>
@@ -954,26 +1019,26 @@ const generateCarne = async (
             </div>
             
             {/* Mostrar carnês existentes */}
-            {carneInstallments.filter(c => c.creditorId === creditor.id).length > 0 && (
+            {carneInstallments.filter(c => c.creditor_id === creditor.id).length > 0 && (
               <div className="mt-4 p-3 bg-muted rounded-md">
                 <h4 className="text-sm font-medium mb-2 flex items-center">
                   <CreditCard className="h-4 w-4 mr-1" />
-                  Carnês Gerados ({carneInstallments.filter(c => c.creditorId === creditor.id).length} parcelas)
+                  Carnês Gerados ({carneInstallments.filter(c => c.creditor_id === creditor.id).length} parcelas)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                   {carneInstallments
-                    .filter(c => c.creditorId === creditor.id)
+                    .filter(c => c.creditor_id === creditor.id)
                     .map((installment) => (
                       <div key={installment.id} className="flex items-center justify-between text-xs p-2 bg-background rounded">
                         <span>
-                          {installment.installmentNumber}ª - {formatCurrency(installment.amount)} 
+                          {installment.installment_number}ª - {formatCurrency(installment.amount)} 
                           <br />
-                          <span className="text-muted-foreground">{formatDate(installment.dueDate)}</span>
+                          <span className="text-muted-foreground">{formatDate(installment.due_date)}</span>
                         </span>
                         <div className="flex space-x-1">
                           {installment.paid ? (
                             <Badge variant="secondary" className="text-xs">
-                              Pago {installment.paidAt && `em ${formatDate(installment.paidAt)}`}
+                              Pago {installment.paid_at && `em ${formatDate(installment.paid_at)}`}
                             </Badge>
                           ) : (
                             <Button 
@@ -1090,12 +1155,12 @@ const generateCarne = async (
     <div className="space-y-4">
       <div>
         <p className="text-sm text-muted-foreground">
-          Cliente: {selectedCreditorForCarne?.customerName}
+          Cliente: {selectedCreditorForCarne?.customer_name}
         </p>
         <p className="text-sm text-muted-foreground">
           Valor Restante:{" "}
           {selectedCreditorForCarne &&
-            formatCurrency(selectedCreditorForCarne.remainingAmount)}
+            formatCurrency(selectedCreditorForCarne.remaining_amount)}
         </p>
       </div>
       
@@ -1107,7 +1172,7 @@ const generateCarne = async (
           <p className="text-sm">
             <strong>Valor por parcela:</strong>{" "}
             {formatCurrency(
-              selectedCreditorForCarne.remainingAmount /
+              selectedCreditorForCarne.remaining_amount /
                 parseInt(installmentsCount || "1", 10)
             )}
           </p>
@@ -1198,10 +1263,10 @@ const generateCarne = async (
             {selectedInstallmentForEdit && (
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Parcela {selectedInstallmentForEdit.installmentNumber}ª - {formatCurrency(selectedInstallmentForEdit.amount)}
+                  Parcela {selectedInstallmentForEdit.installment_number}ª - {formatCurrency(selectedInstallmentForEdit.amount)}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Data atual: {formatDate(selectedInstallmentForEdit.dueDate)}
+                  Data atual: {formatDate(selectedInstallmentForEdit.due_date)}
                 </p>
               </div>
             )}

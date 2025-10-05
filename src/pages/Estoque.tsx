@@ -77,6 +77,7 @@ const Estoque = () => {
     minStock: 5
   });
 
+  
   const [cost, setCost] = useState<number>(0);
   const [margin, setMargin] = useState<number>(0);
   const [tax, setTax] = useState<number>(0);

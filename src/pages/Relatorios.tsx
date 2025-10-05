@@ -48,10 +48,14 @@ const Relatorios = () => {
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+const [customEndDate, setCustomEndDate] = useState<string>('');
+
   useEffect(() => {
     loadData();
   }, [period, selectedUserId]);
 
+  
   const loadData = async () => {
     try {
       setLoading(true);
