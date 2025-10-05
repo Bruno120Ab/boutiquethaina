@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Product, Customer, db } from '@/lib/database';
 import { formatCurrency } from '@/lib/formatters';
 import { PDFGenerator } from '@/lib/pdfGenerator';
 import { Zap, Send, FileText, MessageSquare, Download, Package } from 'lucide-react';
@@ -16,8 +15,8 @@ import { Zap, Send, FileText, MessageSquare, Download, Package } from 'lucide-re
 interface ZapDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  product: Product | null;
-  customers: Customer[];
+  product: any;
+  customers: any[];
 }
 
 // const ZapDialog = ({ isOpen, onClose, product, customers }: ZapDialogProps) => {

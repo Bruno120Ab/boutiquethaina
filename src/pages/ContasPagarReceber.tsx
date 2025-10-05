@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { db, Expense, Product, StockMovement } from '@/lib/database';
+import { expensesApi } from '@/lib/supabaseApi';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -428,16 +428,34 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+type Expense = {
+  id: number;
+  supplier: string;
+  description: string;
+  category?: string | null;
+  amount: number;
+  due_date: string;
+  paid: boolean;
+  created_at: string;
+};
+
 const ContasPagar = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [newExpense, setNewExpense] = useState<Partial<Expense>>({
+  const [newExpense, setNewExpense] = useState<{
+    supplier: string;
+    description: string;
+    category: string;
+    amount: number;
+    dueDate: Date;
+    paid: boolean;
+  }>({
     supplier: '',
     description: '',
     category: '',
     amount: 0,
     dueDate: new Date(),
     paid: false,
-    createdAt: new Date(),
   });
 
   // Filtros
@@ -451,18 +469,21 @@ const ContasPagar = () => {
   }, []);
 
   const loadExpenses = async () => {
-    const allExpenses = await db.expenses.toArray();
+    const allExpenses = await expensesApi.readAll();
     setExpenses(allExpenses);
   };
 
   const saveExpense = async () => {
     if (!newExpense.supplier || !newExpense.amount || !newExpense.dueDate) return;
 
-    await db.expenses.add({
-      ...newExpense,
-      createdAt: new Date(),
+    await expensesApi.create({
+      supplier: newExpense.supplier,
+      description: newExpense.description,
+      category: newExpense.category || null,
+      amount: newExpense.amount,
+      due_date: newExpense.dueDate.toISOString(),
       paid: newExpense.paid || false,
-    } as Expense);
+    });
 
     setNewExpense({
       supplier: '',
@@ -471,20 +492,19 @@ const ContasPagar = () => {
       amount: 0,
       dueDate: new Date(),
       paid: false,
-      createdAt: new Date(),
     });
 
     await loadExpenses();
   };
 
   const togglePaid = async (expense: Expense) => {
-    await db.expenses.update(expense.id!, { paid: !expense.paid });
+    await expensesApi.update(expense.id, { paid: !expense.paid });
     await loadExpenses();
   };
 
   const getDueBadgeVariant = (expense: Expense) => {
     if (expense.paid) return 'success';
-    const daysLeft = differenceInDays(new Date(expense.dueDate), new Date());
+    const daysLeft = differenceInDays(new Date(expense.due_date), new Date());
     if (daysLeft < 0) return 'destructive';
     if (daysLeft <= 3) return 'warning';
     return 'default';
@@ -500,13 +520,13 @@ const ContasPagar = () => {
     let statusMatch = true;
     if (filterStatus === 'pago') statusMatch = expense.paid;
     if (filterStatus === 'pendente')
-      statusMatch = !expense.paid && differenceInDays(new Date(expense.dueDate), new Date()) >= 0;
+      statusMatch = !expense.paid && differenceInDays(new Date(expense.due_date), new Date()) >= 0;
     if (filterStatus === 'vencido')
-      statusMatch = !expense.paid && differenceInDays(new Date(expense.dueDate), new Date()) < 0;
+      statusMatch = !expense.paid && differenceInDays(new Date(expense.due_date), new Date()) < 0;
 
     const dateMatch =
-      (!filterStartDate || new Date(expense.dueDate) >= filterStartDate) &&
-      (!filterEndDate || new Date(expense.dueDate) <= filterEndDate);
+      (!filterStartDate || new Date(expense.due_date) >= filterStartDate) &&
+      (!filterEndDate || new Date(expense.due_date) <= filterEndDate);
 
     return categoryMatch && statusMatch && dateMatch;
   });
@@ -515,7 +535,7 @@ const ContasPagar = () => {
   const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const pendingExpenses = filteredExpenses.filter((e) => !e.paid);
   const upcomingExpenses = filteredExpenses.filter(
-    (e) => !e.paid && differenceInDays(new Date(e.dueDate), new Date()) <= 3
+    (e) => !e.paid && differenceInDays(new Date(e.due_date), new Date()) <= 3
   );
 
   // Gráfico
@@ -672,7 +692,7 @@ const ContasPagar = () => {
       <Card className="p-4 space-y-2 max-h-[400px] overflow-y-auto">
         {filteredExpenses.length === 0 && <p>Nenhuma despesa cadastrada</p>}
         {filteredExpenses.map((expense) => {
-          const daysLeft = differenceInDays(new Date(expense.dueDate), new Date());
+          const daysLeft = differenceInDays(new Date(expense.due_date), new Date());
           const isUpcoming = !expense.paid && daysLeft <= 3 && daysLeft >= 0;
           const isOverdue = !expense.paid && daysLeft < 0;
 
@@ -691,7 +711,7 @@ const ContasPagar = () => {
                     isOverdue ? 'text-red-600' : isUpcoming ? 'text-yellow-700' : 'text-gray-500'
                   }`}
                 >
-                  Vence em: {format(new Date(expense.dueDate), 'dd/MM/yyyy')}
+                  Vence em: {format(new Date(expense.due_date), 'dd/MM/yyyy')}
                 </p>
               </div>
               <div className="flex items-center space-x-4">

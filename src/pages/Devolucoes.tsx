@@ -215,251 +215,495 @@ const Devolucoes = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Devoluções e Trocas</h1>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Devolução/Troca
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nova Devolução/Troca</DialogTitle>
-            </DialogHeader>
+    // <div className="p-6 max-w-7xl mx-auto">
+    //   <div className="flex justify-between items-center mb-6">
+    //     <h1 className="text-3xl font-bold text-foreground">Devoluções e Trocas</h1>
+    //     <Dialog>
+    //       <DialogTrigger asChild>
+    //         <Button>
+    //           <Plus className="h-4 w-4 mr-2" />
+    //           Nova Devolução/Troca
+    //         </Button>
+    //       </DialogTrigger>
+    //       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+    //         <DialogHeader>
+    //           <DialogTitle>Nova Devolução/Troca</DialogTitle>
+    //         </DialogHeader>
             
-            {!selectedSale ? (
-              <div className="space-y-4">
-                <div>
-                  <Label>Buscar Venda</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Digite o ID da venda ou nome do produto..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
+    //         {!selectedSale ? (
+    //           <div className="space-y-4">
+    //             <div>
+    //               <Label>Buscar Venda</Label>
+    //               <div className="relative">
+    //                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+    //                 <Input
+    //                   placeholder="Digite o ID da venda ou nome do produto..."
+    //                   value={searchTerm}
+    //                   onChange={(e) => setSearchTerm(e.target.value)}
+    //                   className="pl-10"
+    //                 />
+    //               </div>
+    //             </div>
 
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {filteredSales.map((sale) => (
-                    <Card 
-                      key={sale.id} 
-                      className="p-4 cursor-pointer hover:bg-muted transition-colors"
-                      onClick={() => {
-                        setSelectedSale(sale);
-                        initializeReturnItems(sale);
-                      }}
-                    >
-                      <div className="flex justify-between items-center">
+    //             <div className="space-y-2 max-h-60 overflow-y-auto">
+    //               {filteredSales.map((sale) => (
+    //                 <Card 
+    //                   key={sale.id} 
+    //                   className="p-4 cursor-pointer hover:bg-muted transition-colors"
+    //                   onClick={() => {
+    //                     setSelectedSale(sale);
+    //                     initializeReturnItems(sale);
+    //                   }}
+    //                 >
+    //                   <div className="flex justify-between items-center">
+    //                     <div>
+    //                       <p className="font-medium">Venda #{sale.id}</p>
+    //                       <p className="text-sm text-muted-foreground">
+    //                         {new Date(sale.createdAt).toLocaleString()}
+    //                       </p>
+    //                       <p className="text-sm text-muted-foreground">
+    //                         {sale.items.length} {sale.items.length === 1 ? 'item' : 'itens'}
+    //                       </p>
+    //                     </div>
+    //                     <div className="text-right">
+    //                       <p className="font-medium">{formatCurrency(sale.total)}</p>
+    //                       <Badge variant="outline">
+    //                         {sale.paymentMethod}
+    //                       </Badge>
+    //                     </div>
+    //                   </div>
+    //                 </Card>
+    //               ))}
+    //             </div>
+    //           </div>
+    //         ) : (
+    //           <div className="space-y-4">
+    //             <div className="flex items-center space-x-2 mb-4">
+    //               <Button 
+    //                 variant="ghost" 
+    //                 size="sm"
+    //                 onClick={() => setSelectedSale(null)}
+    //               >
+    //                 <ArrowLeft className="h-4 w-4 mr-2" />
+    //                 Voltar
+    //               </Button>
+    //               <div>
+    //                 <p className="font-medium">Venda #{selectedSale.id}</p>
+    //                 <p className="text-sm text-muted-foreground">
+    //                   {new Date(selectedSale.createdAt).toLocaleString()}
+    //                 </p>
+    //               </div>
+    //             </div>
+
+    //             <div className="grid grid-cols-2 gap-4">
+    //               <div>
+    //                 <Label>Tipo</Label>
+    //                 <Select value={returnType} onValueChange={(value: 'devolucao' | 'troca') => setReturnType(value)}>
+    //                   <SelectTrigger>
+    //                     <SelectValue />
+    //                   </SelectTrigger>
+    //                   <SelectContent>
+    //                     <SelectItem value="devolucao">Devolução</SelectItem>
+    //                     <SelectItem value="troca">Troca</SelectItem>
+    //                   </SelectContent>
+    //                 </Select>
+    //               </div>
+    //             </div>
+
+    //             <div>
+    //               <Label>Motivo</Label>
+    //               <Textarea
+    //                 placeholder="Descreva o motivo da devolução/troca..."
+    //                 value={returnReason}
+    //                 onChange={(e) => setReturnReason(e.target.value)}
+    //               />
+    //             </div>
+
+    //             <div>
+    //               <Label>Itens da Venda</Label>
+    //               <div className="space-y-2 max-h-60 overflow-y-auto">
+    //                 {returnItems.map((item) => (
+    //                   <Card key={item.productId} className="p-3">
+    //                     <div className="flex items-center justify-between">
+    //                       <div className="flex-1">
+    //                         <p className="font-medium">{item.productName}</p>
+    //                         <p className="text-sm text-muted-foreground">
+    //                           {formatCurrency(item.price)} cada
+    //                         </p>
+    //                       </div>
+    //                       <div className="flex items-center space-x-2">
+    //                         <div>
+    //                           <Label className="text-xs">Quantidade</Label>
+    //                           <Input
+    //                             type="number"
+    //                             min="0"
+    //                             max={getMaxReturnQuantity(item.productId)}
+    //                             value={item.quantity}
+    //                             onChange={(e) => updateReturnItemQuantity(item.productId, parseInt(e.target.value) || 0)}
+    //                             className="w-20"
+    //                           />
+    //                         </div>
+    //                         <div>
+    //                           <Label className="text-xs">Condição</Label>
+    //                           <Select 
+    //                             value={item.condition} 
+    //                             onValueChange={(value: 'nova' | 'usada' | 'danificada') => {
+    //                               setReturnItems(items => 
+    //                                 items.map(i => 
+    //                                   i.productId === item.productId 
+    //                                     ? { ...i, condition: value }
+    //                                     : i
+    //                                 )
+    //                               );
+    //                             }}
+    //                           >
+    //                             <SelectTrigger className="w-32">
+    //                               <SelectValue />
+    //                             </SelectTrigger>
+    //                             <SelectContent>
+    //                               <SelectItem value="nova">Nova</SelectItem>
+    //                               <SelectItem value="usada">Usada</SelectItem>
+    //                               <SelectItem value="danificada">Danificada</SelectItem>
+    //                             </SelectContent>
+    //                           </Select>
+    //                         </div>
+    //                       </div>
+    //                     </div>
+    //                   </Card>
+    //                 ))}
+    //               </div>
+    //             </div>
+
+    //             <div className="flex justify-end space-x-2">
+    //               <Button variant="outline" onClick={() => setSelectedSale(null)}>
+    //                 Cancelar
+    //               </Button>
+    //               <Button onClick={processReturn}>
+    //                 Processar {returnType === 'devolucao' ? 'Devolução' : 'Troca'}
+    //               </Button>
+    //             </div>
+    //           </div>
+    //         )}
+    //       </DialogContent>
+    //     </Dialog>
+    //   </div>
+
+    //   {/* Lista de Devoluções */}
+    //   <div className="grid gap-6">
+    //     <Card className="p-6">
+    //       <h3 className="text-lg font-semibold mb-4">Devoluções Recentes</h3>
+    //       <div className="space-y-4">
+    //         {returns.map((return_) => (
+    //           <div key={return_.id} className="flex items-center justify-between p-4 bg-muted rounded-lg">
+    //             <div className="flex items-center space-x-4">
+    //               <div className="p-2 bg-background rounded-lg">
+    //                 {return_.type === 'devolucao' ? 
+    //                   <ArrowLeft className="h-5 w-5" /> : 
+    //                   <RefreshCw className="h-5 w-5" />
+    //                 }
+    //               </div>
+    //               <div>
+    //                 <p className="font-medium">
+    //                   {return_.type === 'devolucao' ? 'Devolução' : 'Troca'} #{return_.id}
+    //                 </p>
+    //                 <p className="text-sm text-muted-foreground">
+    //                   Venda #{return_.saleId} • {new Date(return_.createdAt).toLocaleString()}
+    //                 </p>
+    //                 <p className="text-sm text-muted-foreground">
+    //                   {return_.items.length} {return_.items.length === 1 ? 'item' : 'itens'}
+    //                 </p>
+    //               </div>
+    //             </div>
+                
+    //             <div className="flex items-center space-x-4">
+    //               <div className="text-right">
+    //                 <p className="font-medium">{formatCurrency(return_.totalRefund)}</p>
+    //                 <Badge 
+    //                   variant={
+    //                     return_.status === 'processada' ? 'default' :
+    //                     return_.status === 'cancelada' ? 'destructive' : 'secondary'
+    //                   }
+    //                 >
+    //                   {return_.status}
+    //                 </Badge>
+    //               </div>
+                  
+    //               {return_.status === 'pendente' && (
+    //                 <div className="flex space-x-2">
+    //                   <Button
+    //                     size="sm"
+    //                     onClick={() => updateReturnStatus(return_.id!, 'processada')}
+    //                   >
+    //                     <CheckCircle className="h-4 w-4 mr-1" />
+    //                     Processar
+    //                   </Button>
+    //                   <Button
+    //                     size="sm"
+    //                     variant="destructive"
+    //                     onClick={() => updateReturnStatus(return_.id!, 'cancelada')}
+    //                   >
+    //                     <XCircle className="h-4 w-4 mr-1" />
+    //                     Cancelar
+    //                   </Button>
+    //                 </div>
+    //               )}
+    //             </div>
+    //           </div>
+    //         ))}
+            
+    //         {returns.length === 0 && (
+    //           <p className="text-center text-muted-foreground py-8">
+    //             Nenhuma devolução registrada
+    //           </p>
+    //         )}
+    //       </div>
+    //     </Card>
+    //   </div>
+    // </div>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 sm:gap-0">
+    <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Devoluções e Trocas</h1>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button className="w-full sm:w-auto flex justify-center sm:justify-start">
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Devolução/Troca
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-full sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Nova Devolução/Troca</DialogTitle>
+        </DialogHeader>
+        
+        {!selectedSale ? (
+          <div className="space-y-4">
+            <div>
+              <Label>Buscar Venda</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Digite o ID da venda ou nome do produto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {filteredSales.map((sale) => (
+                <Card 
+                  key={sale.id} 
+                  className="p-4 cursor-pointer hover:bg-muted transition-colors"
+                  onClick={() => {
+                    setSelectedSale(sale);
+                    initializeReturnItems(sale);
+                  }}
+                >
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                    <div>
+                      <p className="font-medium">Venda #{sale.id}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(sale.createdAt).toLocaleString()}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {sale.items.length} {sale.items.length === 1 ? 'item' : 'itens'}
+                      </p>
+                    </div>
+                    <div className="text-right mt-2 sm:mt-0">
+                      <p className="font-medium">{formatCurrency(sale.total)}</p>
+                      <Badge variant="outline">{sale.paymentMethod}</Badge>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setSelectedSale(null)}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button>
+              <div>
+                <p className="font-medium">Venda #{selectedSale.id}</p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(selectedSale.createdAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo</Label>
+                <Select value={returnType} onValueChange={(value: 'devolucao' | 'troca') => setReturnType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="devolucao">Devolução</SelectItem>
+                    <SelectItem value="troca">Troca</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label>Motivo</Label>
+              <Textarea
+                placeholder="Descreva o motivo da devolução/troca..."
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Itens da Venda</Label>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {returnItems.map((item) => (
+                  <Card key={item.productId} className="p-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <p className="font-medium">{item.productName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatCurrency(item.price)} cada
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                         <div>
-                          <p className="font-medium">Venda #{sale.id}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(sale.createdAt).toLocaleString()}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {sale.items.length} {sale.items.length === 1 ? 'item' : 'itens'}
-                          </p>
+                          <Label className="text-xs">Quantidade</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max={getMaxReturnQuantity(item.productId)}
+                            value={item.quantity}
+                            onChange={(e) => updateReturnItemQuantity(item.productId, parseInt(e.target.value) || 0)}
+                            className="w-full sm:w-20"
+                          />
                         </div>
-                        <div className="text-right">
-                          <p className="font-medium">{formatCurrency(sale.total)}</p>
-                          <Badge variant="outline">
-                            {sale.paymentMethod}
-                          </Badge>
+                        <div>
+                          <Label className="text-xs">Condição</Label>
+                          <Select 
+                            value={item.condition} 
+                            onValueChange={(value: 'nova' | 'usada' | 'danificada') => {
+                              setReturnItems(items => 
+                                items.map(i => 
+                                  i.productId === item.productId 
+                                    ? { ...i, condition: value }
+                                    : i
+                                )
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="w-full sm:w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="nova">Nova</SelectItem>
+                              <SelectItem value="usada">Usada</SelectItem>
+                              <SelectItem value="danificada">Danificada</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                    </Card>
-                  ))}
-                </div>
+                    </div>
+                  </Card>
+                ))}
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Button 
-                    variant="ghost" 
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+              <Button variant="outline" onClick={() => setSelectedSale(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={processReturn}>
+                Processar {returnType === 'devolucao' ? 'Devolução' : 'Troca'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  </div>
+
+  {/* Lista de Devoluções */}
+  <div className="grid gap-6">
+    <Card className="p-4 sm:p-6">
+      <h3 className="text-lg sm:text-xl font-semibold mb-4">Devoluções Recentes</h3>
+      <div className="space-y-4">
+        {returns.map((return_) => (
+          <div key={return_.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-muted rounded-lg gap-4 sm:gap-0">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-background rounded-lg">
+                {return_.type === 'devolucao' ? 
+                  <ArrowLeft className="h-5 w-5" /> : 
+                  <RefreshCw className="h-5 w-5" />
+                }
+              </div>
+              <div>
+                <p className="font-medium">
+                  {return_.type === 'devolucao' ? 'Devolução' : 'Troca'} #{return_.id}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Venda #{return_.saleId} • {new Date(return_.createdAt).toLocaleString()}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {return_.items.length} {return_.items.length === 1 ? 'item' : 'itens'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <div className="text-right">
+                <p className="font-medium">{formatCurrency(return_.totalRefund)}</p>
+                <Badge 
+                  variant={
+                    return_.status === 'processada' ? 'default' :
+                    return_.status === 'cancelada' ? 'destructive' : 'secondary'
+                  }
+                >
+                  {return_.status}
+                </Badge>
+              </div>
+              
+              {return_.status === 'pendente' && (
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                  <Button
                     size="sm"
-                    onClick={() => setSelectedSale(null)}
+                    onClick={() => updateReturnStatus(return_.id!, 'processada')}
                   >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Voltar
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Processar
                   </Button>
-                  <div>
-                    <p className="font-medium">Venda #{selectedSale.id}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(selectedSale.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Tipo</Label>
-                    <Select value={returnType} onValueChange={(value: 'devolucao' | 'troca') => setReturnType(value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="devolucao">Devolução</SelectItem>
-                        <SelectItem value="troca">Troca</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Motivo</Label>
-                  <Textarea
-                    placeholder="Descreva o motivo da devolução/troca..."
-                    value={returnReason}
-                    onChange={(e) => setReturnReason(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label>Itens da Venda</Label>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {returnItems.map((item) => (
-                      <Card key={item.productId} className="p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium">{item.productName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatCurrency(item.price)} cada
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <div>
-                              <Label className="text-xs">Quantidade</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                max={getMaxReturnQuantity(item.productId)}
-                                value={item.quantity}
-                                onChange={(e) => updateReturnItemQuantity(item.productId, parseInt(e.target.value) || 0)}
-                                className="w-20"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Condição</Label>
-                              <Select 
-                                value={item.condition} 
-                                onValueChange={(value: 'nova' | 'usada' | 'danificada') => {
-                                  setReturnItems(items => 
-                                    items.map(i => 
-                                      i.productId === item.productId 
-                                        ? { ...i, condition: value }
-                                        : i
-                                    )
-                                  );
-                                }}
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="nova">Nova</SelectItem>
-                                  <SelectItem value="usada">Usada</SelectItem>
-                                  <SelectItem value="danificada">Danificada</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setSelectedSale(null)}>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => updateReturnStatus(return_.id!, 'cancelada')}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
                     Cancelar
                   </Button>
-                  <Button onClick={processReturn}>
-                    Processar {returnType === 'devolucao' ? 'Devolução' : 'Troca'}
-                  </Button>
                 </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Lista de Devoluções */}
-      <div className="grid gap-6">
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Devoluções Recentes</h3>
-          <div className="space-y-4">
-            {returns.map((return_) => (
-              <div key={return_.id} className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="p-2 bg-background rounded-lg">
-                    {return_.type === 'devolucao' ? 
-                      <ArrowLeft className="h-5 w-5" /> : 
-                      <RefreshCw className="h-5 w-5" />
-                    }
-                  </div>
-                  <div>
-                    <p className="font-medium">
-                      {return_.type === 'devolucao' ? 'Devolução' : 'Troca'} #{return_.id}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Venda #{return_.saleId} • {new Date(return_.createdAt).toLocaleString()}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {return_.items.length} {return_.items.length === 1 ? 'item' : 'itens'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <p className="font-medium">{formatCurrency(return_.totalRefund)}</p>
-                    <Badge 
-                      variant={
-                        return_.status === 'processada' ? 'default' :
-                        return_.status === 'cancelada' ? 'destructive' : 'secondary'
-                      }
-                    >
-                      {return_.status}
-                    </Badge>
-                  </div>
-                  
-                  {return_.status === 'pendente' && (
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        onClick={() => updateReturnStatus(return_.id!, 'processada')}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Processar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => updateReturnStatus(return_.id!, 'cancelada')}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Cancelar
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            
-            {returns.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">
-                Nenhuma devolução registrada
-              </p>
-            )}
+              )}
+            </div>
           </div>
-        </Card>
+        ))}
+        
+        {returns.length === 0 && (
+          <p className="text-center text-muted-foreground py-8">
+            Nenhuma devolução registrada
+          </p>
+        )}
       </div>
-    </div>
+    </Card>
+  </div>
+</div>
+
   );
 };
 

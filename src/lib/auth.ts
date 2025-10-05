@@ -1,9 +1,9 @@
-import { db, User } from './database';
+import { systemUsersApi } from './supabaseApi';
 
 export interface AuthUser {
   id: number;
   username: string;
-  role: 'admin' | 'vendedor' | 'estoquista' | 'estagiario';
+  role: string;
 }
 
 class AuthService {
@@ -11,19 +11,15 @@ class AuthService {
 
   async login(username: string, password: string): Promise<AuthUser | null> {
     try {
-      const user = await db.users
-        .where('username')
-        .equals(username)
-        .first();
+      const user = await systemUsersApi.findByUsername(username);
 
-      if (user && user.password === password) { // Em produção, usar bcrypt
+      if (user && user.password === password) {
         this.currentUser = {
-          id: user.id!,
+          id: Number(user.id),
           username: user.username,
           role: user.role
         };
         
-        // Salvar no localStorage
         localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
         
         return this.currentUser;

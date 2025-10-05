@@ -10,8 +10,14 @@ export const formatNumber = (value: number): string => {
   return new Intl.NumberFormat('pt-BR').format(value);
 };
 
-export const formatDate = (date: Date): string => {
-  return new Intl.DateTimeFormat('pt-BR').format(date);
+// export const formatDate = (date: Date): string => {
+//   return new Intl.DateTimeFormat('pt-BR').format(date);
+// };
+export const formatDate = (date: string | Date | null | undefined): string => {
+  if (!date) return ''; // retorna vazio se nulo ou undefined
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return ''; // data inválida
+  return new Intl.DateTimeFormat('pt-BR').format(d);
 };
 
 export const formatDateTime = (date: Date): string => {
