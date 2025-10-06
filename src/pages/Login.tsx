@@ -102,10 +102,10 @@ const Login = ({ onLogin }: LoginProps) => {
           </Button>
         </form>
 
-        <div className="text-xs text-muted-foreground text-center space-y-1">
+        {/* <div className="text-xs text-muted-foreground text-center space-y-1">
           <p><strong>Admin:</strong> admin / admin123</p>
           <p><strong>Estagiário:</strong> estagiario / estagiario123</p>
-        </div>
+        </div> */}
       </Card>
     </div>
   );
