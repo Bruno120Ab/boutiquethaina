@@ -89,12 +89,17 @@ const Credores = () => {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [customMessage, setCustomMessage] = useState('');
   const [selectedVia, setSelectedVia] = useState<"cliente" | "credor" | "ambos" | "">("");
-
+  
   // Form fields
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [totalDebt, setTotalDebt] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  
+  // Partial payment states
+  const [showPartialPaymentDialog, setShowPartialPaymentDialog] = useState(false);
+  const [selectedCreditorForPayment, setSelectedCreditorForPayment] = useState<Creditor | null>(null);
+  const [partialPaymentAmount, setPartialPaymentAmount] = useState('');
 
   function getInstallmentsFromDescription(description: string): number {
   const match = description.match(/(\d+)\s*x/i);
@@ -651,6 +656,66 @@ if (editingCreditor) {
     }
   };
 
+  const handlePartialPayment = async () => {
+    if (!selectedCreditorForPayment || !partialPaymentAmount) {
+      toast({
+        title: "Erro",
+        description: "Informe o valor do pagamento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const paymentValue = parseFloat(partialPaymentAmount);
+      
+      if (paymentValue <= 0) {
+        toast({
+          title: "Erro",
+          description: "O valor do pagamento deve ser maior que zero.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (paymentValue > selectedCreditorForPayment.remaining_amount) {
+        toast({
+          title: "Erro",
+          description: "O valor do pagamento não pode ser maior que o valor restante.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newPaidAmount = selectedCreditorForPayment.paid_amount + paymentValue;
+      const newRemainingAmount = selectedCreditorForPayment.total_debt - newPaidAmount;
+      const newStatus = newRemainingAmount <= 0 ? 'pago' : selectedCreditorForPayment.status;
+
+      await creditorsApi.update(selectedCreditorForPayment.id, {
+        paid_amount: newPaidAmount,
+        remaining_amount: newRemainingAmount,
+        status: newStatus
+      });
+
+      toast({
+        title: "Pagamento registrado!",
+        description: `Pagamento de ${formatCurrency(paymentValue)} registrado com sucesso.`,
+      });
+
+      setShowPartialPaymentDialog(false);
+      setSelectedCreditorForPayment(null);
+      setPartialPaymentAmount('');
+      loadCreditors();
+    } catch (error) {
+      console.error('Erro ao processar pagamento parcial:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível processar o pagamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSendCarneZap = async (creditor: Creditor) => {
     if (!webhookUrl) {
       toast({
@@ -975,6 +1040,20 @@ if (editingCreditor) {
                     >
                       <FileText className="h-4 w-4" />
                       <span>Gerar Carnê</span>
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => {
+                        setSelectedCreditorForPayment(creditor);
+                        setPartialPaymentAmount('');
+                        setShowPartialPaymentDialog(true);
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center space-x-1"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      <span>Pagamento Parcial</span>
                     </Button>
                     
                     <Button 
@@ -1324,6 +1403,84 @@ if (editingCreditor) {
                 className="flex-1"
               >
                 Salvar Nova Data
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para pagamento parcial */}
+      <Dialog open={showPartialPaymentDialog} onOpenChange={setShowPartialPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pagamento Parcial</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {selectedCreditorForPayment && (
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Cliente: {selectedCreditorForPayment.customer_name}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Valor Total: {formatCurrency(selectedCreditorForPayment.total_debt)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Valor Pago: {formatCurrency(selectedCreditorForPayment.paid_amount)}
+                </p>
+                <p className="text-sm font-medium">
+                  Valor Restante: {formatCurrency(selectedCreditorForPayment.remaining_amount)}
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="partialPaymentAmount">Valor do Pagamento *</Label>
+              <Input
+                id="partialPaymentAmount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={selectedCreditorForPayment?.remaining_amount}
+                placeholder="0,00"
+                value={partialPaymentAmount}
+                onChange={(e) => setPartialPaymentAmount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Digite o valor que o cliente está pagando
+              </p>
+            </div>
+            
+            {partialPaymentAmount && selectedCreditorForPayment && (
+              <div className="p-3 bg-muted rounded-md space-y-1">
+                <p className="text-sm">
+                  <strong>Valor a pagar:</strong> {formatCurrency(parseFloat(partialPaymentAmount) || 0)}
+                </p>
+                <p className="text-sm">
+                  <strong>Saldo após pagamento:</strong>{' '}
+                  {formatCurrency(selectedCreditorForPayment.remaining_amount - (parseFloat(partialPaymentAmount) || 0))}
+                </p>
+              </div>
+            )}
+            
+            <div className="flex space-x-2">
+              <Button 
+                onClick={() => {
+                  setShowPartialPaymentDialog(false);
+                  setSelectedCreditorForPayment(null);
+                  setPartialPaymentAmount('');
+                }} 
+                variant="outline" 
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handlePartialPayment}
+                disabled={!partialPaymentAmount || parseFloat(partialPaymentAmount) <= 0}
+                className="flex-1"
+              >
+                Confirmar Pagamento
               </Button>
             </div>
           </div>

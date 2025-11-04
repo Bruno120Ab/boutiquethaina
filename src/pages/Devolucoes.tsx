@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { db, Sale, Return, ReturnItem, Exchange, StockMovement } from '@/lib/database';
 import { authService } from '@/lib/auth';
 import { formatCurrency } from '@/lib/formatters';
+import { salesApi, returnsApi, exchangesApi, productsApi, stockMovementsApi } from '@/lib/supabaseApi';
 import { 
   ArrowLeft, 
   Search, 
@@ -21,10 +21,40 @@ import {
   Plus
 } from 'lucide-react';
 
+interface Sale {
+  id: number;
+  items: any[];
+  total: number;
+  payment_method: string;
+  customer_id?: number | null;
+  created_at: string;
+}
+
+interface Return {
+  id: number;
+  sale_id: number;
+  items: ReturnItem[];
+  type: string;
+  reason: string;
+  total_refund: number;
+  status: string;
+  created_at: string;
+  user_id: number;
+  customer_id?: number | null;
+}
+
+interface ReturnItem {
+  productId: number;
+  productName: string;
+  quantity: number;
+  price: number;
+  condition: 'nova' | 'usada' | 'danificada';
+}
+
 const Devolucoes = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [returns, setReturns] = useState<Return[]>([]);
-  const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const [exchanges, setExchanges] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,13 +72,13 @@ const Devolucoes = () => {
     try {
       setLoading(true);
       const [salesData, returnsData, exchangesData] = await Promise.all([
-        db.sales.orderBy('createdAt').reverse().toArray(),
-        db.returns.orderBy('createdAt').reverse().toArray(),
-        db.exchanges.orderBy('createdAt').reverse().toArray()
+        salesApi.readAll(),
+        returnsApi.readAll(),
+        exchangesApi.readAll()
       ]);
       
-      setSales(salesData);
-      setReturns(returnsData);
+      setSales(salesData as any);
+      setReturns(returnsData as any);
       setExchanges(exchangesData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -120,40 +150,36 @@ const Devolucoes = () => {
 
       const totalRefund = itemsToReturn.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-      const returnData: Omit<Return, 'id'> = {
-        saleId: selectedSale.id!,
-        items: itemsToReturn,
+      const returnData = {
+        sale_id: selectedSale.id,
+        items: itemsToReturn as any,
         type: returnType,
         reason: returnReason,
-        totalRefund,
+        total_refund: totalRefund,
         status: 'pendente',
-        createdAt: new Date(),
-        userId: currentUser.id!,
-        customerId: selectedSale.customerId
+        user_id: currentUser.id!,
+        customer_id: selectedSale.customer_id
       };
 
-      await db.returns.add(returnData);
+      await returnsApi.create(returnData);
 
       // Atualizar estoque para devoluções
       if (returnType === 'devolucao') {
         for (const item of itemsToReturn) {
-          const product = await db.products.get(item.productId);
+          const product = await productsApi.read(item.productId);
           if (product && item.condition !== 'danificada') {
-            await db.products.update(item.productId, { 
-              stock: product.stock + item.quantity,
-              updatedAt: new Date()
+            await productsApi.update(item.productId, { 
+              stock: product.stock + item.quantity
             });
 
             // Registrar movimentação de estoque
-            const stockMovement: Omit<StockMovement, 'id'> = {
-              productId: item.productId,
-              productName: item.productName,
+            await stockMovementsApi.create({
+              product_id: item.productId,
+              product_name: item.productName,
               type: 'entrada',
               quantity: item.quantity,
-              reason: `Devolução - ${returnReason}`,
-              createdAt: new Date()
-            };
-            await db.stockMovements.add(stockMovement);
+              reason: `Devolução - ${returnReason}`
+            });
           }
         }
       }
@@ -180,9 +206,9 @@ const Devolucoes = () => {
 
   const updateReturnStatus = async (returnId: number, status: 'processada' | 'cancelada') => {
     try {
-      await db.returns.update(returnId, { 
+      await returnsApi.update(returnId, { 
         status, 
-        processedAt: new Date() 
+        processed_at: new Date().toISOString() 
       });
       
       toast({
@@ -504,7 +530,7 @@ const Devolucoes = () => {
                     <div>
                       <p className="font-medium">Venda #{sale.id}</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(sale.createdAt).toLocaleString()}
+                        {new Date(sale.created_at).toLocaleString()}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {sale.items.length} {sale.items.length === 1 ? 'item' : 'itens'}
@@ -512,7 +538,7 @@ const Devolucoes = () => {
                     </div>
                     <div className="text-right mt-2 sm:mt-0">
                       <p className="font-medium">{formatCurrency(sale.total)}</p>
-                      <Badge variant="outline">{sale.paymentMethod}</Badge>
+                      <Badge variant="outline">{sale.payment_method}</Badge>
                     </div>
                   </div>
                 </Card>
@@ -533,7 +559,7 @@ const Devolucoes = () => {
               <div>
                 <p className="font-medium">Venda #{selectedSale.id}</p>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(selectedSale.createdAt).toLocaleString()}
+                  {new Date(selectedSale.created_at).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -650,7 +676,7 @@ const Devolucoes = () => {
                   {return_.type === 'devolucao' ? 'Devolução' : 'Troca'} #{return_.id}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Venda #{return_.saleId} • {new Date(return_.createdAt).toLocaleString()}
+                  Venda #{return_.sale_id} • {new Date(return_.created_at).toLocaleString()}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {return_.items.length} {return_.items.length === 1 ? 'item' : 'itens'}
@@ -660,7 +686,7 @@ const Devolucoes = () => {
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <div className="text-right">
-                <p className="font-medium">{formatCurrency(return_.totalRefund)}</p>
+                <p className="font-medium">{formatCurrency(return_.total_refund)}</p>
                 <Badge 
                   variant={
                     return_.status === 'processada' ? 'default' :
