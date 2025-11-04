@@ -65,7 +65,8 @@ import {
   Printer,
   Zap,
   Send,
-  CreditCard
+  CreditCard,
+  Merge
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -100,6 +101,10 @@ const Credores = () => {
   const [showPartialPaymentDialog, setShowPartialPaymentDialog] = useState(false);
   const [selectedCreditorForPayment, setSelectedCreditorForPayment] = useState<Creditor | null>(null);
   const [partialPaymentAmount, setPartialPaymentAmount] = useState('');
+  
+  // Consolidation states
+  const [showConsolidationDialog, setShowConsolidationDialog] = useState(false);
+  const [selectedCustomerForConsolidation, setSelectedCustomerForConsolidation] = useState<number | null>(null);
 
   function getInstallmentsFromDescription(description: string): number {
   const match = description.match(/(\d+)\s*x/i);
@@ -716,6 +721,108 @@ if (editingCreditor) {
     }
   };
 
+  // Função para identificar clientes com múltiplos débitos
+  const getCustomersWithMultipleDebts = () => {
+    const customerDebtsMap = new Map<number, Creditor[]>();
+    
+    creditors.forEach(creditor => {
+      if (creditor.status !== 'pago') {
+        const existing = customerDebtsMap.get(creditor.customer_id) || [];
+        customerDebtsMap.set(creditor.customer_id, [...existing, creditor]);
+      }
+    });
+
+    return Array.from(customerDebtsMap.entries())
+      .filter(([_, debts]) => debts.length > 1)
+      .map(([customerId, debts]) => ({
+        customerId,
+        customerName: debts[0].customer_name,
+        debts,
+        totalDebt: debts.reduce((sum, d) => sum + d.remaining_amount, 0)
+      }));
+  };
+
+  // Função para consolidar débitos
+  const consolidateDebts = async (customerId: number) => {
+    try {
+      const customerDebts = creditors.filter(
+        c => c.customer_id === customerId && c.status !== 'pago'
+      );
+
+      if (customerDebts.length < 2) {
+        toast({
+          title: "Erro",
+          description: "É necessário ter pelo menos 2 débitos para consolidar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Calcular valores consolidados
+      const totalDebt = customerDebts.reduce((sum, d) => sum + d.total_debt, 0);
+      const paidAmount = customerDebts.reduce((sum, d) => sum + d.paid_amount, 0);
+      const remainingAmount = customerDebts.reduce((sum, d) => sum + d.remaining_amount, 0);
+      
+      // Pegar a data de vencimento mais próxima
+      const earliestDueDate = customerDebts
+        .map(d => new Date(d.due_date))
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+
+      // Criar descrição consolidada
+      const descriptions = customerDebts.map(d => d.description).filter(Boolean);
+      const consolidatedDescription = `Débito Consolidado (${customerDebts.length} débitos unificados)${descriptions.length > 0 ? ' - ' + descriptions.join(', ') : ''}`;
+
+      // Criar novo débito consolidado
+      await creditorsApi.create({
+        customer_id: customerId,
+        customer_name: customerDebts[0].customer_name,
+        total_debt: totalDebt,
+        paid_amount: paidAmount,
+        remaining_amount: remainingAmount,
+        due_date: earliestDueDate.toISOString(),
+        description: consolidatedDescription,
+        status: remainingAmount > 0 ? 'pendente' : 'pago'
+      });
+
+      // Transferir carnês para o novo débito consolidado (se houver)
+      const allCreditors = await creditorsApi.readAll();
+      const newConsolidatedCreditor = allCreditors
+        .filter(c => c.customer_id === customerId)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+      if (newConsolidatedCreditor) {
+        for (const oldCreditor of customerDebts) {
+          const installments = carneInstallments.filter(i => i.creditor_id === oldCreditor.id);
+          for (const installment of installments) {
+            await carneInstallmentsApi.update(installment.id, {
+              creditor_id: newConsolidatedCreditor.id
+            });
+          }
+        }
+      }
+
+      // Deletar débitos antigos
+      await Promise.all(customerDebts.map(d => creditorsApi.delete(d.id)));
+
+      toast({
+        title: "Débitos consolidados!",
+        description: `${customerDebts.length} débitos foram unificados em um único débito.`,
+      });
+
+      setShowConsolidationDialog(false);
+      setSelectedCustomerForConsolidation(null);
+      await loadCreditors();
+      await loadCarneInstallments();
+    } catch (error) {
+      console.error('Erro ao consolidar débitos:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível consolidar os débitos.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSendCarneZap = async (creditor: Creditor) => {
     if (!webhookUrl) {
       toast({
@@ -814,19 +921,30 @@ if (editingCreditor) {
           <p className="text-muted-foreground">Gerencie clientes com pagamentos pendentes</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => resetForm()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Credor
+        <div className="flex space-x-2">
+          {getCustomersWithMultipleDebts().length > 0 && (
+            <Button 
+              variant="outline"
+              onClick={() => setShowConsolidationDialog(true)}
+            >
+              <Merge className="h-4 w-4 mr-2" />
+              Unificar Débitos ({getCustomersWithMultipleDebts().length})
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingCreditor ? 'Editar Credor' : 'Adicionar Credor'}
-              </DialogTitle>
-            </DialogHeader>
+          )}
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => resetForm()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Credor
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingCreditor ? 'Editar Credor' : 'Adicionar Credor'}
+                </DialogTitle>
+              </DialogHeader>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -894,6 +1012,7 @@ if (editingCreditor) {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Cards de resumo */}
@@ -1481,6 +1600,93 @@ if (editingCreditor) {
                 className="flex-1"
               >
                 Confirmar Pagamento
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para consolidação de débitos */}
+      <Dialog open={showConsolidationDialog} onOpenChange={setShowConsolidationDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Unificar Débitos</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Os seguintes clientes possuem múltiplos débitos em aberto. Você pode unificá-los em um único débito consolidado.
+            </p>
+            
+            <div className="space-y-3">
+              {getCustomersWithMultipleDebts().map(({ customerId, customerName, debts, totalDebt }) => (
+                <Card key={customerId} className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="font-semibold">{customerName}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {debts.length} débitos em aberto
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-lg">{formatCurrency(totalDebt)}</p>
+                      <p className="text-xs text-muted-foreground">Total em aberto</p>
+                    </div>
+                  </div>
+                  
+                  <Separator className="my-3" />
+                  
+                  <div className="space-y-2 mb-3">
+                    {debts.map(debt => (
+                      <div key={debt.id} className="flex justify-between text-sm p-2 bg-muted rounded">
+                        <div>
+                          <p className="font-medium">{debt.description || 'Crediário'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Venc: {formatDate(debt.due_date)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">{formatCurrency(debt.remaining_amount)}</p>
+                          {debt.paid_amount > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Pago: {formatCurrency(debt.paid_amount)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <Button 
+                    onClick={() => {
+                      if (confirm(`Deseja realmente unificar os ${debts.length} débitos de ${customerName} em um único débito?`)) {
+                        consolidateDebts(customerId);
+                      }
+                    }}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <Merge className="h-4 w-4 mr-2" />
+                    Unificar Débitos
+                  </Button>
+                </Card>
+              ))}
+            </div>
+            
+            {getCustomersWithMultipleDebts().length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  Nenhum cliente com múltiplos débitos encontrado.
+                </p>
+              </div>
+            )}
+            
+            <div className="flex justify-end">
+              <Button 
+                variant="outline"
+                onClick={() => setShowConsolidationDialog(false)}
+              >
+                Fechar
               </Button>
             </div>
           </div>
