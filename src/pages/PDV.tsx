@@ -182,13 +182,24 @@ const [isCartOpen, setIsCartOpen] = useState(false);
       return;
     }
 
-    if (paymentMethod === 'crediario' && !selectedCustomer) {
-      toast({
-        title: "Cliente obrigatório",
-        description: "Selecione um cliente para vendas no crediário.",
-        variant: "destructive",
-      });
-      return;
+    if (paymentMethod === 'crediario') {
+      if (!selectedCustomer) {
+        toast({
+          title: "Cliente obrigatório",
+          description: "Selecione um cliente para vendas no crediário.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (installments < 1) {
+        toast({
+          title: "Parcelas inválidas",
+          description: "O número de parcelas deve ser pelo menos 1.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     try {
@@ -254,20 +265,42 @@ const [isCartOpen, setIsCartOpen] = useState(false);
 
       // Se for crediário, criar entrada na agenda de credores
       if (paymentMethod === 'crediario' && selectedCustomer) {
-        const customer = customers.find(c => c.id === selectedCustomer);
-        if (customer) {
-          const dueDate = new Date();
-          dueDate.setDate(dueDate.getDate() + 30); // Vencimento em 30 dias
+        try {
+          // Buscar cliente atualizado do banco de dados
+          const customer = await customersApi.read(selectedCustomer);
+          
+          if (!customer) {
+            console.error('Cliente não encontrado:', selectedCustomer);
+            toast({
+              title: "Aviso",
+              description: "Venda registrada, mas não foi possível criar o registro de crédito. Cliente não encontrado.",
+              variant: "destructive",
+            });
+          } else {
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30); // Vencimento em 30 dias
 
-          await creditorsApi.create({
-            customer_id: selectedCustomer,
-            customer_name: customer.name,
-            total_debt: getCartTotal(),
-            paid_amount: 0,
-            remaining_amount: getCartTotal(),
-            due_date: dueDate.toISOString(),
-            description: `Venda #${createdSale.id} - ${installments}x ${formatCurrency(getCartTotal() / installments)}`,
-            status: 'pendente'
+            const creditorData = {
+              customer_id: selectedCustomer,
+              customer_name: customer.name,
+              total_debt: getCartTotal(),
+              paid_amount: 0,
+              remaining_amount: getCartTotal(),
+              due_date: dueDate.toISOString(),
+              description: `Venda #${createdSale.id} - ${installments}x ${formatCurrency(getCartTotal() / installments)}`,
+              status: 'pendente'
+            };
+
+            console.log('Criando registro de credor:', creditorData);
+            await creditorsApi.create(creditorData);
+            console.log('Registro de credor criado com sucesso');
+          }
+        } catch (creditorError) {
+          console.error('Erro ao criar registro de credor:', creditorError);
+          toast({
+            title: "Aviso",
+            description: "Venda registrada, mas houve um erro ao criar o registro de crédito. Verifique a aba de Credores.",
+            variant: "destructive",
           });
         }
       }
