@@ -61,7 +61,7 @@ class AuthService {
     return user?.role === 'admin';
   }
 
-  hasPermission(permission: 'vendas' | 'estoque' | 'relatorios' | 'configuracoes'): boolean {
+  hasPermission(permission: 'vendas' | 'estoque' | 'relatorios' | 'configuracoes' | 'contaspagar'): boolean {
     const user = this.getCurrentUser();
     if (!user) return false;
 
