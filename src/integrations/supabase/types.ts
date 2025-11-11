@@ -290,6 +290,33 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_history: {
+        Row: {
+          amount: number
+          created_at: string
+          creditor_id: number
+          id: number
+          notes: string | null
+          payment_date: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          creditor_id: number
+          id?: never
+          notes?: string | null
+          payment_date?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          creditor_id?: number
+          id?: never
+          notes?: string | null
+          payment_date?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           barcode: string | null

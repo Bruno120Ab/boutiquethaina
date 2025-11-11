@@ -12,8 +12,8 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
-import { creditorsApi, customersApi, carneInstallmentsApi, salesApi, systemUsersApi } from '@/lib/supabaseApi';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { creditorsApi, customersApi, carneInstallmentsApi, salesApi, systemUsersApi, paymentHistoryApi, type PaymentHistory } from '@/lib/supabaseApi';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters';
 import { PDFGenerator } from '@/lib/pdfGenerator';
 
 interface Creditor {
@@ -90,6 +90,9 @@ const Credores = () => {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [customMessage, setCustomMessage] = useState('');
   const [selectedVia, setSelectedVia] = useState<"cliente" | "credor" | "ambos" | "">("");
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
+  const [showPaymentHistoryDialog, setShowPaymentHistoryDialog] = useState(false);
+  const [selectedCreditorForHistory, setSelectedCreditorForHistory] = useState<Creditor | null>(null);
   
   // Form fields
   const [selectedCustomer, setSelectedCustomer] = useState('');
@@ -702,6 +705,14 @@ if (editingCreditor) {
         status: newStatus
       });
 
+      // Registrar no histórico de pagamentos
+      await paymentHistoryApi.create({
+        creditor_id: selectedCreditorForPayment.id,
+        amount: paymentValue,
+        payment_date: new Date().toISOString(),
+        notes: `Pagamento parcial de ${formatCurrency(paymentValue)}`
+      });
+
       toast({
         title: "Pagamento registrado!",
         description: `Pagamento de ${formatCurrency(paymentValue)} registrado com sucesso.`,
@@ -818,6 +829,20 @@ if (editingCreditor) {
       toast({
         title: "Erro",
         description: "Não foi possível consolidar os débitos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadPaymentHistory = async (creditorId: number) => {
+    try {
+      const history = await paymentHistoryApi.readByCreditor(creditorId);
+      setPaymentHistory(history);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar o histórico de pagamentos.",
         variant: "destructive",
       });
     }
@@ -1173,6 +1198,20 @@ if (editingCreditor) {
                     >
                       <DollarSign className="h-4 w-4" />
                       <span>Pagamento Parcial</span>
+                    </Button>
+
+                    <Button 
+                      onClick={async () => {
+                        setSelectedCreditorForHistory(creditor);
+                        await loadPaymentHistory(creditor.id);
+                        setShowPaymentHistoryDialog(true);
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center space-x-1"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Histórico</span>
                     </Button>
                     
                     <Button 
@@ -1600,6 +1639,80 @@ if (editingCreditor) {
                 className="flex-1"
               >
                 Confirmar Pagamento
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de Histórico de Pagamentos */}
+      <Dialog open={showPaymentHistoryDialog} onOpenChange={setShowPaymentHistoryDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Histórico de Pagamentos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedCreditorForHistory && (
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="font-semibold">Cliente:</span> {selectedCreditorForHistory.customer_name}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Débito Total:</span> {formatCurrency(selectedCreditorForHistory.total_debt)}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Valor Pago:</span> {formatCurrency(selectedCreditorForHistory.paid_amount)}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Valor Restante:</span> {formatCurrency(selectedCreditorForHistory.remaining_amount)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm">Pagamentos Realizados</h3>
+              {paymentHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum pagamento parcial registrado ainda.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {paymentHistory.map((payment) => (
+                    <div 
+                      key={payment.id} 
+                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <div className="font-semibold text-primary">
+                          {formatCurrency(Number(payment.amount))}
+                        </div>
+                        {payment.notes && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {payment.notes}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDateTime(new Date(payment.payment_date))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => {
+                  setShowPaymentHistoryDialog(false);
+                  setSelectedCreditorForHistory(null);
+                  setPaymentHistory([]);
+                }} 
+                variant="outline"
+              >
+                Fechar
               </Button>
             </div>
           </div>

@@ -46,6 +46,10 @@ type Exchange = Database['public']['Tables']['exchanges']['Row'];
 type ExchangeInsert = Database['public']['Tables']['exchanges']['Insert'];
 type ExchangeUpdate = Database['public']['Tables']['exchanges']['Update'];
 
+export type PaymentHistory = Database['public']['Tables']['payment_history']['Row'];
+export type PaymentHistoryInsert = Database['public']['Tables']['payment_history']['Insert'];
+export type PaymentHistoryUpdate = Database['public']['Tables']['payment_history']['Update'];
+
 // Generic CRUD functions
 async function createItem<T>(table: keyof Database['public']['Tables'], data: any): Promise<T> {
   const { data: result, error } = await supabase
@@ -211,4 +215,22 @@ export const exchangesApi = {
   read: (id: number) => readItem<Exchange>('exchanges', id),
   update: (id: number, data: ExchangeUpdate) => updateItem<Exchange>('exchanges', id, data),
   delete: (id: number) => deleteItem('exchanges', id)
+};
+
+export const paymentHistoryApi = {
+  create: (data: PaymentHistoryInsert) => createItem<PaymentHistory>('payment_history', data),
+  readAll: () => readItems<PaymentHistory>('payment_history'),
+  read: (id: number) => readItem<PaymentHistory>('payment_history', id),
+  update: (id: number, data: PaymentHistoryUpdate) => updateItem<PaymentHistory>('payment_history', id, data),
+  delete: (id: number) => deleteItem('payment_history', id),
+  readByCreditor: async (creditorId: number): Promise<PaymentHistory[]> => {
+    const { data, error } = await supabase
+      .from('payment_history')
+      .select('*')
+      .eq('creditor_id', creditorId)
+      .order('payment_date', { ascending: false });
+    
+    if (error) throw error;
+    return data as PaymentHistory[];
+  }
 };
