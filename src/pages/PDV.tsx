@@ -66,7 +66,8 @@ const PDV = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
   const [installments, setInstallments] = useState(1);
-const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isProcessingSale, setIsProcessingSale] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -192,7 +193,7 @@ const [isCartOpen, setIsCartOpen] = useState(false);
         return;
       }
       
-      if (installments < 1) {
+      if (!installments || installments < 1) {
         toast({
           title: "Parcelas inválidas",
           description: "O número de parcelas deve ser pelo menos 1.",
@@ -202,6 +203,8 @@ const [isCartOpen, setIsCartOpen] = useState(false);
       }
     }
 
+    setIsProcessingSale(true);
+    
     try {
       const currentUser = authService.getCurrentUser();
       if (!currentUser) {
@@ -210,17 +213,24 @@ const [isCartOpen, setIsCartOpen] = useState(false);
           description: "Usuário não autenticado.",
           variant: "destructive",
         });
+        setIsProcessingSale(false);
         return;
       }
-      console.log(currentUser)
+
       const { data: systemUser, error } = await supabase
         .from('system_users')
         .select('*')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
 
-      if (!systemUser) {
-        console.error('Usuário não encontrado na tabela system_users', error);
+      if (!systemUser || error) {
+        console.error('Usuário não encontrado na tabela system_users:', error);
+        toast({
+          title: "Erro",
+          description: "Usuário não encontrado no sistema.",
+          variant: "destructive",
+        });
+        setIsProcessingSale(false);
         return;
       }
 
@@ -265,43 +275,45 @@ const [isCartOpen, setIsCartOpen] = useState(false);
 
       // Se for crediário, criar entrada na agenda de credores
       if (paymentMethod === 'crediario' && selectedCustomer) {
+        console.log('Iniciando criação de registro de credor para venda:', createdSale.id);
+        
         try {
           // Buscar cliente atualizado do banco de dados
           const customer = await customersApi.read(selectedCustomer);
+          console.log('Cliente encontrado:', customer);
           
           if (!customer) {
-            console.error('Cliente não encontrado:', selectedCustomer);
-            toast({
-              title: "Aviso",
-              description: "Venda registrada, mas não foi possível criar o registro de crédito. Cliente não encontrado.",
-              variant: "destructive",
-            });
-          } else {
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 30); // Vencimento em 30 dias
-
-            const creditorData = {
-              customer_id: selectedCustomer,
-              customer_name: customer.name,
-              total_debt: getCartTotal(),
-              paid_amount: 0,
-              remaining_amount: getCartTotal(),
-              due_date: dueDate.toISOString(),
-              description: `Venda #${createdSale.id} - ${installments}x ${formatCurrency(getCartTotal() / installments)}`,
-              status: 'pendente'
-            };
-
-            console.log('Criando registro de credor:', creditorData);
-            await creditorsApi.create(creditorData);
-            console.log('Registro de credor criado com sucesso');
+            console.error('Cliente não encontrado no banco:', selectedCustomer);
+            throw new Error('Cliente não encontrado');
           }
+
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + 30); // Vencimento em 30 dias
+
+          const creditorData = {
+            customer_id: selectedCustomer,
+            customer_name: customer.name,
+            total_debt: getCartTotal(),
+            paid_amount: 0,
+            remaining_amount: getCartTotal(),
+            due_date: dueDate.toISOString(),
+            description: `Venda #${createdSale.id} - ${installments}x ${formatCurrency(getCartTotal() / installments)}`,
+            status: 'pendente'
+          };
+
+          console.log('Dados do credor a serem criados:', creditorData);
+          const createdCreditor = await creditorsApi.create(creditorData);
+          console.log('Registro de credor criado com sucesso:', createdCreditor);
+          
         } catch (creditorError) {
-          console.error('Erro ao criar registro de credor:', creditorError);
+          console.error('Erro detalhado ao criar registro de credor:', creditorError);
           toast({
-            title: "Aviso",
-            description: "Venda registrada, mas houve um erro ao criar o registro de crédito. Verifique a aba de Credores.",
+            title: "Erro no Crediário",
+            description: "Não foi possível criar o registro de crédito. Por favor, adicione manualmente na aba Credores.",
             variant: "destructive",
           });
+          setIsProcessingSale(false);
+          return; // Não limpa o carrinho se houver erro no crediário
         }
       }
 
@@ -310,21 +322,23 @@ const [isCartOpen, setIsCartOpen] = useState(false);
       setDiscount(0);
       setSelectedCustomer(null);
       setInstallments(1);
+      setPaymentMethod('dinheiro');
       await loadProducts();
 
       toast({
         title: "Venda finalizada!",
-        description: `Venda #${createdSale.id} registrada com sucesso.`,
-        variant: "default",
+        description: `Venda #${createdSale.id} registrada com sucesso${paymentMethod === 'crediario' ? ' e crédito lançado' : ''}.`,
       });
 
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível finalizar a venda.",
+        description: error instanceof Error ? error.message : "Não foi possível finalizar a venda.",
         variant: "destructive",
       });
+    } finally {
+      setIsProcessingSale(false);
     }
   };
 
@@ -549,8 +563,9 @@ const [isCartOpen, setIsCartOpen] = useState(false);
                     onClick={finalizeSale}
                     className="w-full"
                     size="lg"
+                    disabled={isProcessingSale}
                   >
-                    Finalizar Venda
+                    {isProcessingSale ? 'Processando...' : 'Finalizar Venda'}
                   </Button>
                 </div>
               </Card>
