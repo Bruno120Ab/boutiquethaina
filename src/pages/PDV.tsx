@@ -217,22 +217,7 @@ const PDV = () => {
         return;
       }
 
-      const { data: systemUser, error } = await supabase
-        .from('system_users')
-        .select('*')
-        .eq('id', currentUser.id)
-        .maybeSingle();
-
-      if (!systemUser || error) {
-        console.error('Usuário não encontrado na tabela system_users:', error);
-        toast({
-          title: "Erro",
-          description: "Usuário não encontrado no sistema.",
-          variant: "destructive",
-        });
-        setIsProcessingSale(false);
-        return;
-      }
+      console.log('Usuário autenticado:', currentUser);
 
       // Create sale record
       const sale = {
