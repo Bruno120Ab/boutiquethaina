@@ -482,17 +482,35 @@ const PDV = () => {
                   {/* Cliente */}
                   {paymentMethod === 'crediario' && (
                     <div className="space-y-2">
-                      <Label htmlFor="customer">Cliente *</Label>
-                      <Select value={selectedCustomer?.toString() || ''} onValueChange={(value) => setSelectedCustomer(Number(value))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um cliente" />
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="customer">Cliente *</Label>
+                        {customers.length === 0 && (
+                          <span className="text-xs text-muted-foreground">Nenhum cliente cadastrado</span>
+                        )}
+                      </div>
+                      <Select 
+                        value={selectedCustomer?.toString() || ''} 
+                        onValueChange={(value) => setSelectedCustomer(Number(value))}
+                      >
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder={customers.length > 0 ? "Selecione um cliente" : "Cadastre um cliente primeiro"} />
                         </SelectTrigger>
-                        <SelectContent>
-                          {customers.map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id!.toString()}>
-                              {customer.name}
-                            </SelectItem>
-                          ))}
+                        <SelectContent className="z-[100] bg-popover">
+                          {customers.length > 0 ? (
+                            customers.map((customer) => (
+                              <SelectItem 
+                                key={customer.id} 
+                                value={customer.id!.toString()}
+                                className="cursor-pointer hover:bg-accent"
+                              >
+                                {customer.name} {customer.phone && `- ${customer.phone}`}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              Nenhum cliente cadastrado
+                            </div>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
