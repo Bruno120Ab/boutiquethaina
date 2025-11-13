@@ -217,7 +217,9 @@ const PDV = () => {
         return;
       }
 
-      console.log('Usuário autenticado:', currentUser);
+      console.log('Iniciando venda - Usuário:', currentUser);
+      console.log('Total da venda:', getCartTotal());
+      console.log('Itens do carrinho:', cart);
 
       // Create sale record
       const sale = {
@@ -237,43 +239,50 @@ const PDV = () => {
         installment_value: paymentMethod === 'crediario' ? getCartTotal() / installments : null
       };
 
+      console.log('Criando venda com dados:', sale);
       const createdSale = await salesApi.create(sale as any);
+      console.log('Venda criada com sucesso:', createdSale);
 
       // Update stock and create stock movements
       for (const item of cart) {
-        const product = await productsApi.read(item.productId);
-        if (product) {
-          const newStock = product.stock - item.quantity;
-          await productsApi.update(item.productId, { stock: newStock });
+        try {
+          console.log(`Atualizando estoque do produto ${item.productId}`);
+          const product = await productsApi.read(item.productId);
+          if (product) {
+            const newStock = product.stock - item.quantity;
+            await productsApi.update(item.productId, { stock: newStock });
+            console.log(`Estoque atualizado: ${product.stock} -> ${newStock}`);
 
-          // Create stock movement
-          const stockMovement = {
-            product_id: item.productId,
-            product_name: item.productName,
-            type: 'saida',
-            quantity: item.quantity,
-            reason: `Venda #${createdSale.id}`
-          };
-          await stockMovementsApi.create(stockMovement as any);
+            // Create stock movement
+            const stockMovement = {
+              product_id: item.productId,
+              product_name: item.productName,
+              type: 'saida',
+              quantity: item.quantity,
+              reason: `Venda #${createdSale.id}`
+            };
+            await stockMovementsApi.create(stockMovement as any);
+            console.log('Movimento de estoque registrado');
+          }
+        } catch (stockError) {
+          console.error('Erro ao atualizar estoque:', stockError);
+          // Continua mesmo com erro no estoque
         }
       }
 
       // Se for crediário, criar entrada na agenda de credores
       if (paymentMethod === 'crediario' && selectedCustomer) {
-        console.log('Iniciando criação de registro de credor para venda:', createdSale.id);
+        console.log('Criando registro de credor para venda:', createdSale.id);
         
         try {
-          // Buscar cliente atualizado do banco de dados
           const customer = await customersApi.read(selectedCustomer);
-          console.log('Cliente encontrado:', customer);
           
           if (!customer) {
-            console.error('Cliente não encontrado no banco:', selectedCustomer);
             throw new Error('Cliente não encontrado');
           }
 
           const dueDate = new Date();
-          dueDate.setDate(dueDate.getDate() + 30); // Vencimento em 30 dias
+          dueDate.setDate(dueDate.getDate() + 30);
 
           const creditorData = {
             customer_id: selectedCustomer,
@@ -286,19 +295,16 @@ const PDV = () => {
             status: 'pendente'
           };
 
-          console.log('Dados do credor a serem criados:', creditorData);
-          const createdCreditor = await creditorsApi.create(creditorData);
-          console.log('Registro de credor criado com sucesso:', createdCreditor);
+          await creditorsApi.create(creditorData);
+          console.log('Credor criado com sucesso');
           
         } catch (creditorError) {
-          console.error('Erro detalhado ao criar registro de credor:', creditorError);
+          console.error('Erro ao criar credor:', creditorError);
           toast({
-            title: "Erro no Crediário",
-            description: "Não foi possível criar o registro de crédito. Por favor, adicione manualmente na aba Credores.",
-            variant: "destructive",
+            title: "Aviso",
+            description: "Venda registrada, mas houve erro ao criar o registro de crédito. Adicione manualmente na aba Credores.",
+            variant: "default",
           });
-          setIsProcessingSale(false);
-          return; // Não limpa o carrinho se houver erro no crediário
         }
       }
 
@@ -312,14 +318,26 @@ const PDV = () => {
 
       toast({
         title: "Venda finalizada!",
-        description: `Venda #${createdSale.id} registrada com sucesso${paymentMethod === 'crediario' ? ' e crédito lançado' : ''}.`,
+        description: `Venda #${createdSale.id} registrada com sucesso${paymentMethod === 'crediario' ? ' com crédito lançado' : ''}.`,
       });
 
     } catch (error) {
-      console.error('Erro ao finalizar venda:', error);
+      console.error('Erro completo ao finalizar venda:', error);
+      
+      // Mensagem de erro mais detalhada
+      let errorMessage = "Não foi possível finalizar a venda.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (error.message.includes('violates foreign key constraint')) {
+          errorMessage = "Erro de dados: verifique se o usuário e cliente existem no sistema.";
+        } else if (error.message.includes('user_id')) {
+          errorMessage = "Erro: usuário não encontrado no sistema. Faça logout e login novamente.";
+        }
+      }
+      
       toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Não foi possível finalizar a venda.",
+        title: "Erro ao finalizar venda",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
