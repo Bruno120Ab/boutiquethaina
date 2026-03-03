@@ -131,6 +131,7 @@ const CustomerHistory = ({ customer, open, onClose }: CustomerHistoryProps) => {
             <TabsTrigger value="vendas" className="flex-1">
               <ShoppingBag className="h-4 w-4 mr-1" />
               Vendas ({sales.length})
+              {console.log(sales)}
             </TabsTrigger>
             <TabsTrigger value="creditos" className="flex-1">
               <CreditCard className="h-4 w-4 mr-1" />
@@ -160,6 +161,18 @@ const CustomerHistory = ({ customer, open, onClose }: CustomerHistoryProps) => {
                       <p className="text-xs text-muted-foreground mt-1">
                         {items.length} item(s) · {paymentLabels[sale.payment_method] || sale.payment_method}
                         {sale.installments && sale.installments > 1 ? ` · ${sale.installments}x` : ''}
+                        {items.length > 0 && (
+  <div className="mt-3 border-t pt-2 space-y-1">
+    {items.map((item: any, index: number) => (
+      <div key={index} className="flex justify-between text-xs">
+        <span>
+          {item.quantity}x {item.productName}
+        </span>
+        <span>{formatCurrency(item.total)}</span>
+      </div>
+    ))}
+  </div>
+)}
                       </p>
                     </div>
                     <div className="text-right">
