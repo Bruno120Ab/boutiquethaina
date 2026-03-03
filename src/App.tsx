@@ -13,12 +13,12 @@ import Estoque from "./pages/Estoque";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import Credores from "./pages/Credores";
-import Clientes from "./pages/Clientes";
 import Devolucoes from "./pages/Devolucoes";
 import NotFound from "./pages/NotFound";
 import ContasPagar from "./pages/ContasPagarReceber";
 import { useAutoBackup } from "./lib/useAuto";
 import { setupPWAInstallPrompt } from "./pwa";
+import { Clientes } from "./pages/Clientes";
 
 const queryClient = new QueryClient();
 
