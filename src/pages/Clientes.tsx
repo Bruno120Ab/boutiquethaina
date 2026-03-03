@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from '@/hooks/use-toast';
 import { customersApi } from '@/lib/supabaseApi';
 import { formatPhone, formatCPF } from '@/lib/formatters';
+import CustomerHistory from '@/components/CustomerHistory';
 
 type Customer = {
   id: number;
@@ -26,7 +27,8 @@ import {
   Trash2,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  History
 } from 'lucide-react';
 
 const Clientes = () => {
@@ -34,6 +36,8 @@ const Clientes = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
   // Form fields
   const [name, setName] = useState('');
@@ -284,6 +288,14 @@ const Clientes = () => {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => { setHistoryCustomer(customer); setIsHistoryOpen(true); }}
+                  title="Ver histórico"
+                >
+                  <History className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => handleEdit(customer)}
                 >
                   <Edit className="h-3 w-3" />
@@ -345,8 +357,16 @@ const Clientes = () => {
           </div>
         )}
       </div>
+
+      <CustomerHistory
+        customer={historyCustomer}
+        open={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+      />
     </div>
   );
 };
+
+export default Clientes;
 
 export default Clientes;
