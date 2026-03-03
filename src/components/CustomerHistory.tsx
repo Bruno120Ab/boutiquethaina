@@ -131,7 +131,6 @@ const CustomerHistory = ({ customer, open, onClose }: CustomerHistoryProps) => {
             <TabsTrigger value="vendas" className="flex-1">
               <ShoppingBag className="h-4 w-4 mr-1" />
               Vendas ({sales.length})
-              {console.log(sales)}
             </TabsTrigger>
             <TabsTrigger value="creditos" className="flex-1">
               <CreditCard className="h-4 w-4 mr-1" />

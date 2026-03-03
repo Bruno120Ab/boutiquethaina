@@ -31,7 +31,7 @@ import {
   History
 } from 'lucide-react';
 
-const Clientes = () => {
+export const Clientes = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -367,4 +367,3 @@ const Clientes = () => {
   );
 };
 
-export default Clientes;
